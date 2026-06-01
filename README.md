@@ -11,7 +11,7 @@ model running on your own machine instead of a cloud API.
 It auto-detects whichever backend is running, gives the model tools to read/write
 files and run shell commands, and loops until your task is done. Every file write
 and every shell command asks for your approval first.
-https://streamable.com/rpw3lf
+[![Watch the video](https://cdn-cf-east.streamable.com/image/rpw3lf.jpg)](https://streamable.com/rpw3lf)
 ### Quick start (Ollama)
 
 ```bash
