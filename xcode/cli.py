@@ -581,7 +581,7 @@ def _run_repl(args) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="xcode",
+    parser = argparse.ArgumentParser(prog="xcoding",
                                      description="Local-model coding agent.")
     parser.add_argument("-p", "--print", metavar="PROMPT",
                         help="headless: run one prompt, print result, exit")

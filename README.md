@@ -4,7 +4,7 @@ A local-model coding agent by **@c7s89r** — like Claude Code, but it talks to 
 model running on your own machine instead of a cloud API.
 
 > **✅ Works with [Ollama](https://ollama.com) for now.** Just install Ollama,
-> pull a tool-capable model, then `pip install xcoding` and run `xcode`.
+> pull a tool-capable model, then `pip install xcoding` and run `xcoding`.
 > (llama.cpp support is in too, but Ollama is the tested path.)
 
 It auto-detects whichever backend is running, gives the model tools to read/write
@@ -17,7 +17,7 @@ and every shell command asks for your approval first.
 ollama serve
 ollama pull qwen2.5-coder     # a model that's good at tool use
 pip install xcoding
-xcode
+xcoding
 ```
 
 ## Install
@@ -26,7 +26,7 @@ xcode
 pip install xcoding
 ```
 
-Then just run `xcode` from any project folder.
+Then just run `xcoding` from any project folder.
 
 Or from source:
 
@@ -57,7 +57,7 @@ llama-server -m your-model.gguf   # listens on :8080, OpenAI-compatible
 ## Use it
 
 ```bash
-xcode
+xcoding
 # or:  python -m xcode
 ```
 
@@ -76,7 +76,7 @@ In-REPL commands: `/help`, `/models`, `/model`, `/init`, `/todos`, `/perms`,
 - Attach files inline with `@path` (e.g. `explain @xcode/agent.py`).
 - The agent tracks a **todo list** for multi-step work (`/todos` to view).
 - Old turns are **auto-compacted** when the context meter fills; `/compact`
-  forces it. Conversations are **saved** per project — `xcode --resume` or
+  forces it. Conversations are **saved** per project — `xcoding --resume` or
   `/resume` to pick up where you left off.
 - Drop an **XCODE.md** at the repo root (or run `/init`) and it's auto-loaded
   as project memory.
@@ -110,9 +110,9 @@ MCP tools show up to the model as `mcp__<server>__<tool>`.
 ### Headless / scripting
 
 ```bash
-xcode -p "summarize what this repo does"          # read-only, prints, exits
-xcode -p "bump the version to 0.2.0" --yes        # auto-approve writes
-xcode -p "what changed?" --resume                 # continue last session
+xcoding -p "summarize what this repo does"        # read-only, prints, exits
+xcoding -p "bump the version to 0.2.0" --yes      # auto-approve writes
+xcoding -p "what changed?" --resume               # continue last session
 ```
 
 ## Configuration (env vars)
