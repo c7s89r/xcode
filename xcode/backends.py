@@ -39,9 +39,19 @@ class Backend:
     base_url: str
     model: str
     client: OpenAI
+    available: bool = True
+    note: str = ""
 
     def describe(self) -> str:
         return f"{self.name} · {self.model} · {self.base_url}"
+
+    def adopt(self, other: "Backend") -> None:
+        self.name = other.name
+        self.base_url = other.base_url
+        self.model = other.model
+        self.client = other.client
+        self.available = other.available
+        self.note = other.note
 
 
 def _list_ollama_models(root: str) -> list[str]:
@@ -64,8 +74,13 @@ def _probe(root: str) -> bool:
         return False
 
 
-def detect_backend() -> Backend:
-    """Find a running local backend, or raise RuntimeError with guidance.
+def detect_backend(allow_missing: bool = False) -> Backend:
+    """Find a running local backend.
+
+    With ``allow_missing`` false (the default) this raises ``RuntimeError`` with
+    guidance when nothing is running. With it true, it returns a placeholder
+    ``Backend`` whose ``available`` flag is false and whose ``note`` carries the
+    same guidance, so the caller can still start up and report the situation.
 
     Honors overrides:
       XCODE_BASE_URL  — point straight at an OpenAI-compatible /v1 endpoint
@@ -105,7 +120,7 @@ def detect_backend() -> Backend:
         return Backend(name, base_url, model,
                        OpenAI(base_url=base_url, api_key=api_key))
 
-    raise RuntimeError(
+    message = (
         "No local model backend found.\n"
         + "\n".join(errors)
         + "\n\nStart one of:\n"
@@ -113,6 +128,11 @@ def detect_backend() -> Backend:
         "  llama.cpp: `llama-server -m model.gguf` (listens on :8080)\n"
         "Or set XCODE_BASE_URL to any OpenAI-compatible endpoint."
     )
+    if allow_missing:
+        return Backend("none", "", "(no model)",
+                       OpenAI(base_url="http://localhost:11434/v1", api_key=api_key),
+                       available=False, note=message)
+    raise RuntimeError(message)
 
 
 def _first_model_at(base_url: str) -> str | None:

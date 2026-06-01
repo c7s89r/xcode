@@ -410,11 +410,7 @@ def _run_headless(args) -> int:
 
 
 def _run_repl(args) -> int:
-    try:
-        backend = detect_backend()
-    except RuntimeError as e:
-        console.print(f"[red]{e}[/]")
-        return 1
+    backend = detect_backend(allow_missing=True)
     if args.model:
         backend.model = args.model
 
@@ -437,6 +433,9 @@ def _run_repl(args) -> int:
         notes.append("settings.json")
     mem_note = (" " + " · ".join(notes)) if notes else ""
     console.print(ui.welcome(theme, backend.model, str(Path.cwd()), mem_note))
+    if not backend.available:
+        console.print(f"[yellow]{backend.note}[/]")
+        console.print("[dim]Start a model and just type — I'll connect when it's up.[/]")
     console.print()
 
     def _save_mode(m):
@@ -539,6 +538,14 @@ def _run_repl(args) -> int:
             console.print("[dim]conversation cleared[/]"); continue
         if raw == "/init":
             raw = memory.INIT_INSTRUCTION
+
+        if not backend.available:
+            try:
+                backend.adopt(detect_backend())
+                console.print(f"[green]connected[/] {backend.describe()}\n")
+            except RuntimeError as e:
+                console.print(f"[yellow]{e}[/]\n")
+                continue
 
         try:
             agent.send(_expand_mentions(raw))
