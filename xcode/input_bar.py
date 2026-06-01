@@ -69,6 +69,40 @@ except Exception:  # pragma: no cover
     AVAILABLE = False
 
 
+def _enable_shift_enter() -> None:
+    """Make Shift+Enter distinguishable from Enter on the Windows console.
+
+    prompt_toolkit's Win32 input reader collapses Shift+Enter into a plain
+    Enter (there is no ShiftEnter key). We wrap it so that, when Shift is held
+    on Return, the key is re-tagged as Ctrl+J — which we then bind to insert a
+    newline. Enter (Ctrl+M) is left alone and still submits.
+    """
+    try:
+        from prompt_toolkit.input.win32 import ConsoleInputReader
+        from prompt_toolkit.keys import Keys
+    except Exception:
+        return  # not on Windows / no win32 reader — nothing to patch
+    orig = ConsoleInputReader._event_to_key_presses
+    if getattr(orig, "_xcode_patched", False):
+        return
+    SHIFT_PRESSED = 0x0010
+
+    def patched(self, ev):
+        presses = orig(self, ev)
+        if ev.ControlKeyState & SHIFT_PRESSED:
+            for kp in presses:
+                if kp.key in (Keys.ControlM, getattr(Keys, "Enter", Keys.ControlM)):
+                    kp.key = Keys.ControlJ
+        return presses
+
+    patched._xcode_patched = True
+    ConsoleInputReader._event_to_key_presses = patched
+
+
+if AVAILABLE:
+    _enable_shift_enter()
+
+
 def cycle(mode: str) -> str:
     return MODES[(MODES.index(mode) + 1) % len(MODES)] if mode in MODES else "normal"
 
@@ -226,6 +260,10 @@ class InputBar:
         def _(event):
             event.current_buffer.undo()
 
+        @kb.add("c-j")  # Shift+Enter (remapped) / Ctrl+J → newline, not submit
+        def _(event):
+            event.current_buffer.insert_text("\n")
+
         style = Style.from_dict({
             "bottom-toolbar": "bg:default noreverse",
             "completion-menu.completion": "bg:default",
@@ -286,8 +324,9 @@ class InputBar:
         n = self.tokens()
         tok = f"{n:,} tokens"
         fname = getattr(self.uic, "last_file", None)
+        hint = "  ·  ⇧⏎ newline"
         # Pack the segments together with small separators — no big pad gap.
-        right = "  ·  " + (f"⧉ {fname}  ·  " if fname else "") + tok
+        right = "  ·  " + (f"⧉ {fname}  ·  " if fname else "") + tok + hint
         status_line = seg_mode + seg_agents + right
 
         return FormattedText([

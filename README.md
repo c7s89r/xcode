@@ -1,11 +1,24 @@
 # xcode
 
-A local-model coding agent — like Claude Code, but it talks to **Ollama** or
-**llama.cpp** running on your own machine instead of a cloud API.
+A local-model coding agent — like Claude Code, but it talks to a model
+running on your own machine instead of a cloud API.
+
+> **✅ Works with [Ollama](https://ollama.com) for now.** Just install Ollama,
+> pull a tool-capable model, then `pip install xcode` and run `xcode`.
+> (llama.cpp support is in too, but Ollama is the tested path.)
 
 It auto-detects whichever backend is running, gives the model tools to read/write
 files and run shell commands, and loops until your task is done. Every file write
 and every shell command asks for your approval first.
+
+### Quick start (Ollama)
+
+```bash
+ollama serve
+ollama pull qwen2.5-coder     # a model that's good at tool use
+pip install xcode
+xcode
+```
 
 ## Install
 
