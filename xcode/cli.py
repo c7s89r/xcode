@@ -22,7 +22,7 @@ from .agent import Agent
 from .backends import detect_backend, list_models
 from .config import CONTEXT_TOKENS
 from . import (memory, session, ui, hooks as hooks_mod, mcp as mcp_mod,
-               input_bar, tools as tools_mod)
+               input_bar, tools as tools_mod, update as update_mod)
 from .permissions import Permissions
 
 console = Console()
@@ -409,7 +409,36 @@ def _run_headless(args) -> int:
     return 0
 
 
+def _update_gate() -> None:
+    cur, latest, avail = update_mod.check()
+    if not avail:
+        return
+    console.clear()
+    body = Text()
+    body.append("A new version of xcode is available\n\n", style="bold")
+    body.append(f"  installed   {cur}\n", style="dim")
+    body.append(f"  latest      {latest}\n", style="green")
+    body.append("\n[I] install        [C] cancel", style="bold")
+    console.print(Panel(body, title="xcode update", border_style="cyan",
+                        expand=False, padding=(1, 3)))
+    try:
+        choice = console.input("  > ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return
+    if choice in ("i", "install", "y", "yes"):
+        console.print("[dim]upgrading…[/]")
+        rc = update_mod.upgrade()
+        if rc == 0:
+            console.print("[green]updated — relaunching[/]\n")
+            update_mod.relaunch()
+        else:
+            console.print("[red]update failed — staying on the current version[/]\n")
+    else:
+        console.clear()
+
+
 def _run_repl(args) -> int:
+    _update_gate()
     backend = detect_backend(allow_missing=True)
     if args.model:
         backend.model = args.model
