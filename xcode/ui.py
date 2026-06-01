@@ -48,34 +48,37 @@ TIPS = [
     "Use /perms reset to clear saved permissions",
     "Try 'add tests for the auth module'",
     "Press ctrl+c to cancel the current input",
+    "Press esc while I'm replying to stop me mid-thought",
+    "Run /theme to browse every color theme",
+    "Use /export to save this conversation as Markdown",
+    "Run /doctor if something looks off",
 ]
 
+def _theme(border, ghost, eyes, tree, accent, tool, mode):
+    return {
+        "border": border, "ghost": ghost, "eyes": eyes, "tree": tree,
+        "accent": accent, "title": f"bold {accent}", "user": f"bold {accent}",
+        "tool": tool, "mode": mode,
+    }
+
+
 THEMES: dict[str, dict] = {
-    "ghost": {
-        "border": "grey93", "ghost": "grey93", "eyes": "grey42",
-        "tree": "grey58", "accent": "white", "title": "bold white",
-        "user": "bold white", "tool": "grey50", "mode": "white",
-    },
-    "matrix": {
-        "border": "green", "ghost": "green1", "eyes": "bright_green",
-        "tree": "green3", "accent": "green1", "title": "bold green",
-        "user": "bold green", "tool": "green4", "mode": "green",
-    },
-    "dracula": {
-        "border": "purple", "ghost": "grey93", "eyes": "bright_magenta",
-        "tree": "spring_green3", "accent": "orchid", "title": "bold purple",
-        "user": "bold orchid", "tool": "grey50", "mode": "orchid",
-    },
-    "ember": {
-        "border": "dark_orange3", "ghost": "wheat1", "eyes": "orange1",
-        "tree": "dark_olive_green3", "accent": "orange1", "title": "bold orange1",
-        "user": "bold orange1", "tool": "grey50", "mode": "dark_orange",
-    },
-    "mono": {
-        "border": "grey50", "ghost": "grey93", "eyes": "grey70",
-        "tree": "grey58", "accent": "grey85", "title": "bold white",
-        "user": "bold white", "tool": "grey42", "mode": "grey70",
-    },
+    "ghost":     _theme("grey93", "grey93", "grey42", "grey58", "white", "grey50", "white"),
+    "matrix":    _theme("green", "green1", "bright_green", "green3", "green1", "green4", "green"),
+    "dracula":   _theme("#bd93f9", "#f8f8f2", "#ff79c6", "#50fa7b", "#bd93f9", "#6272a4", "#ff79c6"),
+    "ember":     _theme("dark_orange3", "wheat1", "orange1", "dark_olive_green3", "orange1", "grey50", "dark_orange"),
+    "mono":      _theme("grey50", "grey93", "grey70", "grey58", "grey85", "grey42", "grey70"),
+    "nord":      _theme("#88c0d0", "#eceff4", "#5e81ac", "#a3be8c", "#88c0d0", "#4c566a", "#81a1c1"),
+    "gruvbox":   _theme("#d79921", "#fbf1c7", "#cc241d", "#98971a", "#fabd2f", "#7c6f64", "#d65d0e"),
+    "solarized": _theme("#268bd2", "#fdf6e3", "#b58900", "#859900", "#2aa198", "#586e75", "#6c71c4"),
+    "neon":      _theme("#ff007c", "#f6f6ff", "#00e5ff", "#7c4dff", "#00e5ff", "#6a3d9a", "#ff2bd6"),
+    "ocean":     _theme("#2389da", "#e0fbfc", "#05668d", "#028090", "#00a5cf", "#386170", "#2389da"),
+    "rose":      _theme("#ff8fab", "#fff0f3", "#c9184a", "#ffb3c1", "#ff758f", "#a4677b", "#ff758f"),
+    "sunset":    _theme("#ff7b00", "#ffedd8", "#ff006e", "#ffaa00", "#ff5400", "#9d4e15", "#ff006e"),
+    "ice":       _theme("#90e0ef", "#caf0f8", "#0077b6", "#48cae4", "#00b4d8", "#5c7c8a", "#48cae4"),
+    "forest":    _theme("#2d6a4f", "#d8f3dc", "#1b4332", "#40916c", "#52b788", "#4a5e54", "#2d6a4f"),
+    "vapor":     _theme("#b14aed", "#f7f0ff", "#05ffa1", "#ff71ce", "#01cdfe", "#6d5b97", "#b14aed"),
+    "coffee":    _theme("#a47148", "#f3e5d8", "#6f4e37", "#a47148", "#c8a27c", "#7f5539", "#a47148"),
 }
 
 DEFAULT_THEME = "ghost"
@@ -306,7 +309,7 @@ class ThinkingStatus:
         meta = f"({int(elapsed)}s · ↓ {self.tokens / 1000:.1f}k tokens"
         if shells:
             meta += f" · {shells} shell{'s' if shells != 1 else ''} running"
-        meta += ")"
+        meta += " · esc to interrupt)"
         head.append(meta, style="dim")
         
         lines = [head]
@@ -336,3 +339,19 @@ def save_prefs(prefs: dict) -> None:
 
 def get_theme(name: str) -> dict:
     return THEMES.get(name, THEMES[DEFAULT_THEME])
+
+
+def theme_gallery(current: str = "") -> Group:
+    """A swatch list of every theme, each rendered in its own colors."""
+    from rich.style import Style
+    rows = [Text("Themes  ", style="bold").append("(usage: /theme nord)",
+                                                   style="dim")]
+    for name, th in THEMES.items():
+        line = Text("  ")
+        mark = "●" if name == current else "○"
+        line.append(f"{mark} ", style=th["accent"])
+        line.append(f"{name:<11}", style=th["title"])
+        for key in ("border", "ghost", "eyes", "tree", "accent"):
+            line.append("██", style=Style(color=th[key]))
+        rows.append(line)
+    return Group(*rows)

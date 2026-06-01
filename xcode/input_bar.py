@@ -51,6 +51,8 @@ PLACEHOLDERS = [
     'Type / to see every slash command',
     'Hit ctrl+z to undo your last edit',
     'Run /theme matrix to go full hacker mode',
+    'Press esc while I reply to interrupt me',
+    'Run /theme to browse 16 color themes',
 ]
 
 try:

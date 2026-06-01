@@ -105,9 +105,18 @@ Then just talk to it:
 › add a /health endpoint to app.py that returns {"ok": true}
 ```
 
-In-REPL commands: `/help`, `/models`, `/model`, `/init`, `/todos`, `/perms`,
-`/compact`, `/sessions`, `/resume`, `/reset`, `/exit`.
+Type `/` to see every command. There's a full Claude-Code-style set:
+`/help`, `/model`, `/models`, `/auto`, `/theme`, `/vim`, `/status`, `/cost`,
+`/doctor`, `/config`, `/mcp`, `/agents`, `/init`, `/memory`, `/todos`, `/perms`,
+`/export`, `/compact`, `/clear`, `/sessions`, `/resume`, `/reset`, `/upgrade`,
+`/release-notes`, `/bug`, `/login`, `/logout`, `/privacy`, `/terminal-setup`,
+`/exit`.
 
+- **Press `esc` while it's replying to interrupt** — it stops mid-thought and
+  hands the prompt back, just like Claude Code.
+- **16 color themes** — run `/theme` to browse the gallery, `/theme nord` to
+  switch (ghost, matrix, dracula, ember, mono, nord, gruvbox, solarized, neon,
+  ocean, rose, sunset, ice, forest, vapor, coffee).
 - Replies **stream** live; the prompt shows a **context meter** (`~3.2k/8k`).
 - Writes/commands ask `y / n / a`; **a** ("always") is saved to
   `.xcode/permissions.json`. Edits show a **colored diff** preview.

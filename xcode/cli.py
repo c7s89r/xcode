@@ -32,22 +32,39 @@ COMMANDS = [
     ("/model", "Switch the active model"),
     ("/models", "List models on reachable backends"),
     ("/auto", "Toggle auto mode (run & write without asking)"),
-    ("/theme", "Switch theme: ghost, matrix, dracula, ember, mono"),
+    ("/theme", "Switch color theme (/theme to list them)"),
+    ("/vim", "Toggle vim editing mode in the input"),
+    ("/status", "Show backend, model, mode, context, version"),
+    ("/cost", "Show session cost (always $0 — runs locally)"),
+    ("/doctor", "Check backend, version, and environment"),
+    ("/config", "Show current settings"),
     ("/mcp", "List connected MCP servers and their tools"),
+    ("/agents", "About sub-agents"),
     ("/init", "Explore the project and write an XCODE.md"),
     ("/memory", "Show the loaded project memory (XCODE.md)"),
     ("/todos", "Show the current task list"),
     ("/perms", "Show or clear saved permissions (/perms reset)"),
+    ("/permissions", "Alias of /perms"),
+    ("/export", "Export the conversation to a Markdown file"),
     ("/compact", "Summarize the conversation to free up context"),
+    ("/clear", "Clear the conversation and the screen"),
     ("/sessions", "List saved sessions"),
     ("/resume", "Resume the latest (or a given) session"),
     ("/reset", "Clear the conversation"),
+    ("/upgrade", "Check for and install a new version"),
+    ("/release-notes", "Open the release notes"),
+    ("/bug", "Report a bug on GitHub"),
+    ("/login", "Not needed — xcode is local"),
+    ("/logout", "Not needed — xcode is local"),
+    ("/privacy", "How your data is handled"),
+    ("/terminal-setup", "Terminal key setup info"),
     ("/exit", "Quit xcode"),
 ]
 
 HELP = "Commands:\n" + "\n".join(
-    f"  {name:<10} {desc}" for name, desc in COMMANDS
-) + "\n\nType a request to work. Use @path to attach files."
+    f"  {name:<16} {desc}" for name, desc in COMMANDS
+) + ("\n\nType a request to work. Use @path to attach files. "
+     "Press esc to interrupt a reply, shift+tab to cycle modes.")
 
 
 class UI:
@@ -352,6 +369,76 @@ def _expand_mentions(text: str) -> str:
     return text + "\n\n[Attached files]\n" + "\n\n".join(attached)
 
 
+def _print_status(backend, uic, agent) -> None:
+    ver = update_mod.current_version() or "?"
+    where = backend.describe() if backend.available else "none (no model running)"
+    console.print(f"[bold]xcode[/] v{ver}")
+    console.print(f"  backend   {where}")
+    console.print(f"  mode      {uic.mode}")
+    console.print(f"  context   ~{agent.context_tokens():,} tokens")
+    console.print(f"  cwd       {Path.cwd()}")
+
+
+def _doctor(backend) -> None:
+    console.print("[bold]xcode doctor[/]")
+    console.print(f"  python    {sys.version.split()[0]}")
+    console.print(f"  version   {update_mod.current_version() or '?'}")
+    found = list_models()
+    if found:
+        for name, models in found.items():
+            console.print(f"  [green]✓[/] {name}: {', '.join(models) or '(no models pulled)'}")
+    else:
+        console.print("  [yellow]✗[/] no local backend reachable "
+                      "— start ollama or llama.cpp")
+    cur, latest, avail = update_mod.check()
+    if avail:
+        console.print(f"  [yellow]update[/] {cur} → {latest}  (run /upgrade)")
+    elif cur:
+        console.print("  [green]✓[/] up to date")
+
+
+def _export_conversation(agent, path: str | None = None) -> str | None:
+    from datetime import datetime
+    lines: list[str] = []
+    for m in agent.messages:
+        role = m.get("role")
+        if role == "system":
+            continue
+        content = m.get("content") or ""
+        if role == "user":
+            lines.append(f"## You\n\n{content}\n")
+        elif role == "assistant":
+            if content:
+                lines.append(f"## xcode\n\n{content}\n")
+            for tc in m.get("tool_calls", []) or []:
+                fn = tc.get("function", {})
+                lines.append(f"> 🛠 `{fn.get('name')}` {fn.get('arguments', '')}\n")
+        elif role == "tool":
+            lines.append(f"> ⎿ {(content or '')[:500]}\n")
+    if not lines:
+        return None
+    if not path:
+        path = f"xcode-conversation-{datetime.now():%Y%m%d-%H%M%S}.md"
+    try:
+        Path(path).write_text("\n".join(lines), encoding="utf-8")
+        return path
+    except Exception:
+        return None
+
+
+def _toggle_vim(bar) -> bool:
+    try:
+        from prompt_toolkit.enums import EditingMode
+        s = getattr(bar, "_session", None)
+        if s is None:
+            return False
+        s.editing_mode = (EditingMode.EMACS if s.editing_mode == EditingMode.VI
+                          else EditingMode.VI)
+        return s.editing_mode == EditingMode.VI
+    except Exception:
+        return False
+
+
 def _make_agent(uic: UI, settings=None, mcp=None) -> Agent:
     return Agent(uic.backend, confirm=uic.confirm, on_token=uic.on_token,
                  on_turn_end=uic.on_turn_end, on_tool=uic.on_tool,
@@ -512,9 +599,11 @@ def _run_repl(args) -> int:
                 theme = ui.get_theme(parts[1]); uic.theme = theme
                 prefs["theme"] = parts[1]; ui.save_prefs(prefs)
                 console.print(ui.welcome(theme, backend.model, str(Path.cwd())))
+            elif len(parts) > 1:
+                console.print(f"[yellow]no theme '{parts[1]}'[/]")
+                console.print(ui.theme_gallery(prefs.get("theme", "ghost")))
             else:
-                console.print(f"themes: {', '.join(ui.THEMES)}  "
-                              f"(usage: /theme matrix)")
+                console.print(ui.theme_gallery(prefs.get("theme", "ghost")))
             continue
         if raw == "/models":
             for name, models in list_models().items():
@@ -565,6 +654,57 @@ def _run_repl(args) -> int:
         if raw == "/reset":
             agent.reset(); session_id = None
             console.print("[dim]conversation cleared[/]"); continue
+        if raw == "/clear":
+            agent.reset(); session_id = None
+            console.clear()
+            console.print(ui.welcome(theme, backend.model, str(Path.cwd())))
+            console.print(); continue
+        if raw == "/permissions":
+            console.print(f"[bold]saved permissions:[/] {uic.perms.summary()}")
+            continue
+        if raw in ("/status", "/about"):
+            _print_status(backend, uic, agent); continue
+        if raw == "/cost":
+            console.print("[green]$0.00[/] — xcode runs a local model, "
+                          "so there are no API costs."); continue
+        if raw == "/doctor":
+            _doctor(backend); continue
+        if raw == "/config":
+            console.print(f"  [bold]theme[/]  {prefs.get('theme', 'ghost')}")
+            console.print(f"  [bold]mode[/]   {uic.mode}")
+            console.print(f"  [dim]prefs: {ui.PREFS}[/]"); continue
+        if raw == "/agents":
+            console.print("[dim]Sub-agents are built in — ask me to delegate a "
+                          "subtask and I'll spawn an isolated agent automatically.[/]")
+            continue
+        if raw.startswith("/export"):
+            parts = raw.split(maxsplit=1)
+            out = _export_conversation(agent, parts[1].strip() if len(parts) > 1 else None)
+            console.print(f"[green]exported[/] → {out}" if out
+                          else "[yellow]nothing to export yet[/]"); continue
+        if raw == "/vim":
+            on = _toggle_vim(bar)
+            console.print(f"[dim]vim mode {'on' if on else 'off'}[/]"); continue
+        if raw in ("/upgrade", "/update"):
+            _update_gate(); continue
+        if raw in ("/release-notes", "/changelog"):
+            console.print("Release notes: "
+                          "https://github.com/c7s89r/xcode/releases"); continue
+        if raw == "/bug":
+            console.print("Report a bug: "
+                          "https://github.com/c7s89r/xcode/issues/new"); continue
+        if raw in ("/login", "/logout"):
+            console.print("[dim]xcode talks to a local model — "
+                          "no account or login needed.[/]"); continue
+        if raw in ("/privacy", "/privacy-settings"):
+            console.print("[dim]Everything stays on your machine. No telemetry, "
+                          "nothing leaves your computer.[/]"); continue
+        if raw == "/terminal-setup":
+            console.print("[dim]Enter sends · Shift+Enter inserts a newline "
+                          "(auto-configured on Windows).[/]"); continue
+        if raw.startswith("/add-dir"):
+            console.print("[dim]xcode already reads your whole project tree "
+                          "from the current directory.[/]"); continue
         if raw == "/init":
             raw = memory.INIT_INSTRUCTION
 
@@ -579,8 +719,11 @@ def _run_repl(args) -> int:
         try:
             agent.send(_expand_mentions(raw))
             session_id = session.save(agent.messages, backend.model, session_id)
+            if agent.interrupted:
+                console.print("[yellow]⎿ interrupted[/] [dim]· press esc anytime to stop a reply[/]")
         except KeyboardInterrupt:
-            uic.on_turn_end(); console.print("\n[yellow]interrupted[/]")
+            uic.on_turn_end()
+            console.print("[yellow]⎿ interrupted[/] [dim]· press esc anytime to stop a reply[/]")
         except Exception as e:
             uic.on_turn_end(); console.print(f"[red]error: {e}[/]")
         console.print()

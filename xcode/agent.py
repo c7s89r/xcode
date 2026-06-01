@@ -12,6 +12,7 @@ from typing import Callable, Optional
 from .backends import Backend
 from .config import (COMPACT_AT, CONTEXT_TOKENS, KEEP_RECENT, MAX_AGENT_STEPS,
                      SYSTEM_PROMPT, estimate_tokens)
+from .keys import KeyInterrupt
 from . import tools
 
 Confirm = Callable[[str, str, str], bool]
@@ -53,6 +54,7 @@ class Agent:
         self.mcp = mcp
         self.depth = depth
         self.todos: list[dict] = []
+        self.interrupted = False
         self.messages: list[dict] = [self._system()]
 
     def reset(self) -> None:
@@ -75,6 +77,7 @@ class Agent:
 
     def send(self, user_input: str) -> None:
         """Run one full turn: user message -> (model <-> tools)* -> final reply."""
+        self.interrupted = False
         self.messages.append({"role": "user", "content": user_input})
         self._maybe_compact()
 
@@ -82,13 +85,16 @@ class Agent:
             content, tool_calls = self._stream_once()
 
             entry: dict = {"role": "assistant", "content": content}
-            if tool_calls:
+            if tool_calls and not self.interrupted:
                 entry["tool_calls"] = [
                     {"id": tc["id"], "type": "function",
                      "function": {"name": tc["name"], "arguments": tc["arguments"]}}
                     for tc in tool_calls
                 ]
             self.messages.append(entry)
+
+            if self.interrupted:
+                return
 
             if not tool_calls:
                 return
@@ -194,31 +200,41 @@ class Agent:
         printed_any = False
 
         try:
-            for chunk in stream:
-                if not chunk.choices:
-                    continue
-                delta = chunk.choices[0].delta
+            with KeyInterrupt() as ki:
+                for chunk in stream:
+                    if ki.pressed():
+                        self.interrupted = True
+                        break
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
 
-                if getattr(delta, "content", None):
-                    self.on_token(delta.content)
-                    content_parts.append(delta.content)
-                    printed_any = True
+                    if getattr(delta, "content", None):
+                        self.on_token(delta.content)
+                        content_parts.append(delta.content)
+                        printed_any = True
 
-                for tc in (getattr(delta, "tool_calls", None) or []):
-                    if waiting:
-                        self.on_wait_end(); waiting = False
-                    slot = calls.setdefault(tc.index,
-                                            {"id": "", "name": "", "arguments": ""})
-                    if tc.id:
-                        slot["id"] = tc.id
-                    if tc.function:
-                        if tc.function.name:
-                            slot["name"] += tc.function.name
-                        if tc.function.arguments:
-                            slot["arguments"] += tc.function.arguments
+                    for tc in (getattr(delta, "tool_calls", None) or []):
+                        if waiting:
+                            self.on_wait_end(); waiting = False
+                        slot = calls.setdefault(tc.index,
+                                                {"id": "", "name": "", "arguments": ""})
+                        if tc.id:
+                            slot["id"] = tc.id
+                        if tc.function:
+                            if tc.function.name:
+                                slot["name"] += tc.function.name
+                            if tc.function.arguments:
+                                slot["arguments"] += tc.function.arguments
+        except KeyboardInterrupt:
+            self.interrupted = True
         finally:
             if waiting:
                 self.on_wait_end()
+            try:
+                stream.close()
+            except Exception:
+                pass
 
         if printed_any:
             self.on_turn_end()
