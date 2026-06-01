@@ -1,0 +1,23 @@
+# secrets — never commit
+token.txt
+*.pypirc
+
+# python build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# local agent state
+.xcode/sessions/
+.xcode/permissions.json
+.xcode/ui.json
+
+# venvs / editors
+.venv/
+venv/
+.env
+.vscode/
+.idea/
