@@ -1,12 +1,12 @@
 [project]
-name = "xcode"
-version = "0.1.0"
-description = "A local-model coding agent — Claude Code, but powered by Ollama or llama.cpp."
+name = "xcoding"
+version = "0.1.1"
+description = "xcoding by @c7s89r — a local-model coding agent. Claude Code, but powered by Ollama or llama.cpp."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-authors = [{ name = "c7s89r nzv" }]
-maintainers = [{ name = "c7s89r nzv" }]
+authors = [{ name = "c7s89r", email = "c7s89r@users.noreply.github.com" }]
+maintainers = [{ name = "c7s89r", email = "c7s89r@users.noreply.github.com" }]
 keywords = ["cli", "coding-agent", "ollama", "llama.cpp", "ai", "local-llm"]
 classifiers = [
     "Development Status :: 4 - Beta",
