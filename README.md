@@ -93,8 +93,11 @@ llama-server -m your-model.gguf   # listens on :8080, OpenAI-compatible
 
 ```bash
 xcoding
-# or:  python -m xcode
+# same thing:  xcode
+# or:          python -m xcode
 ```
+
+`xcoding` and `xcode` are interchangeable — type whichever you like.
 
 Then just talk to it:
 

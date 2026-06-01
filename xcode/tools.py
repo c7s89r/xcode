@@ -18,24 +18,14 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 import httpx
 
-# confirm(kind, target, detail) -> allow?
-#   kind   = stable id of the action ("write_file", "run_command", ...)
-#   target = the thing acted on (a path, or the command string)
-#   detail = human-readable preview shown to the user
 Confirm = Callable[[str, str, str], bool]
 
-MAX_OUTPUT = 20_000          # clip giant tool results so we don't blow context
+MAX_OUTPUT = 20_000
 
-# Side channel: the last write/edit stashes its diff here so the CLI can render
-# a Claude-Code-style numbered diff even in auto mode (where there's no confirm
-# preview). Reset at the start of every dispatch().
 RENDER: dict = {}
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv",
              ".xcode", "dist", "build", ".mypy_cache", ".pytest_cache"}
 
-# Long-running commands started with background=True keep running here so the
-# agent can fire off a server/build and carry on. background_count() prunes the
-# finished ones and reports how many are still alive (shown in the spinner).
 _BG: list = []
 
 
@@ -66,8 +56,6 @@ def _diff(old: str, new: str, path: str) -> str:
         lines = lines[:80] + [f"... [{len(lines) - 80} more diff lines]"]
     return "\n".join(lines)
 
-
-# ---------------------------------------------------------------- tool impls
 
 def read_file(path: str) -> str:
     p = Path(path)
@@ -211,35 +199,29 @@ def run_command(command: str, confirm: Confirm, background: bool = False,
         except Exception as e:
             return f"ERROR starting background command: {e}"
     
-    # Stream output in real-time if callback provided
     if on_output:
         try:
-            # Use unbuffered output for real-time streaming
             proc = subprocess.Popen(
                 command, 
                 shell=True,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,  # Merge stderr into stdout
+                stderr=subprocess.STDOUT,
                 text=True,
-                bufsize=0,  # Unbuffered
+                bufsize=0,
                 universal_newlines=True
             )
             
             output_lines = []
             
-            # Read output character by character for true real-time streaming
             while True:
                 char = proc.stdout.read(1)
                 if not char:
-                    # Process finished
                     if proc.poll() is not None:
                         break
                     continue
                 
-                # Stream each character immediately
                 on_output(char)
                 
-                # Also collect for final result
                 if char == '\n':
                     output_lines.append('')
                 elif output_lines or char.strip():
@@ -249,7 +231,6 @@ def run_command(command: str, confirm: Confirm, background: bool = False,
             
             proc.wait(timeout=120)
             
-            # Build result
             body = '\n'.join(output_lines).strip()
             body += f"\n[exit {proc.returncode}]"
             
@@ -261,7 +242,6 @@ def run_command(command: str, confirm: Confirm, background: bool = False,
         except Exception as e:
             return f"ERROR running command: {e}"
     
-    # Fallback to non-streaming mode
     try:
         proc = subprocess.run(command, shell=True, capture_output=True,
                               text=True, timeout=120)
@@ -280,8 +260,6 @@ def _trim(s: str, n: int = 300) -> str:
     s = s.replace("\n", "\\n")
     return s if len(s) <= n else s[:n] + "…"
 
-
-# ------------------------------------------------------------------- web
 
 _TAG = re.compile(r"<[^>]+>")
 _WS = re.compile(r"[ \t]*\n[ \t\n]*")
@@ -342,8 +320,6 @@ def web_search(query: str) -> str:
         return f"(no results for '{query}')"
     return f"Results for '{query}':\n\n" + "\n\n".join(results)
 
-
-# ------------------------------------------------------------------ schemas
 
 def _fn(name, desc, props, required=()):
     return {"type": "function", "function": {

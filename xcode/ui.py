@@ -17,10 +17,8 @@ from rich.table import Table
 from rich.text import Text
 
 PREFS = Path(".xcode") / "ui.json"
-# The source logo we render into the terminal (lives at the project root).
 LOGO = Path(__file__).resolve().parent.parent / "logo.png"
 
-# The little glyph that spins while we think, and the words it cycles through.
 SPIN_GLYPHS = "✻✷✶✳✺✸"
 THINKING_WORDS = [
     "Envisioning", "Thinking", "Pondering", "Cooking", "Conjuring",
@@ -52,9 +50,8 @@ TIPS = [
     "Press ctrl+c to cancel the current input",
 ]
 
-# Each theme picks colors for the border, the ghost, the trees, accents, etc.
 THEMES: dict[str, dict] = {
-    "ghost": {  # default — clean white ghost on black
+    "ghost": {
         "border": "grey93", "ghost": "grey93", "eyes": "grey42",
         "tree": "grey58", "accent": "white", "title": "bold white",
         "user": "bold white", "tool": "grey50", "mode": "white",
@@ -88,7 +85,6 @@ def _ghost_text(theme: dict) -> Text:
     g = theme["ghost"]
     e = theme["eyes"]
 
-    # Ghost facing RIGHT
     logo_lines = [
         " ▓▓▓▓▓",
         "▓▓▓▓▓▓▓",
@@ -99,7 +95,6 @@ def _ghost_text(theme: dict) -> Text:
 
     t = Text()
     for line in logo_lines:
-        # Color the eyes (▒) differently
         if "▒" in line:
             parts = line.split("▒")
             for i, part in enumerate(parts):
@@ -172,7 +167,7 @@ def _logo_segments(width: int, rows: int):
 
     px = im.load()
     opq = [[px[x, y][3] >= 128 for x in range(width)] for y in range(rows)]
-    _, ghost = _largest_blob(opq, width, rows)      # drop resized sparkle bits
+    _, ghost = _largest_blob(opq, width, rows)
 
     def lum(x, y):
         p = px[x, y]
@@ -180,8 +175,6 @@ def _logo_segments(width: int, rows: int):
 
     dark = [[ghost[y][x] and lum(x, y) < 128 for x in range(width)] for y in range(rows)]
 
-    # outline = dark rim touching the background; flood it so only the enclosed
-    # dark (eyes + mouth) stays a 'feature'.
     outline = [[False] * width for _ in range(rows)]
     dq = deque()
     for y in range(rows):
@@ -199,11 +192,11 @@ def _logo_segments(width: int, rows: int):
     for y in range(rows):
         for x in range(width):
             if not ghost[y][x]:
-                out[y][x] = 0                       # background → transparent
+                out[y][x] = 0
             elif dark[y][x] and not outline[y][x]:
-                out[y][x] = 2                       # enclosed feature → black
+                out[y][x] = 2
             else:
-                out[y][x] = 1                       # body (fill + outline rim)
+                out[y][x] = 1
     return out
 
 
@@ -217,11 +210,11 @@ def logo(theme: dict, width: int = 26) -> Text:
     """
     from rich.style import Style
 
-    rows = width + (width & 1)                      # even → 2 pixels per cell
+    rows = width + (width & 1)
     try:
         seg = _logo_segments(width, rows)
     except Exception:
-        return _ghost_text(theme)                   # no Pillow / no file → ASCII
+        return _ghost_text(theme)
 
     fill = {0: None, 1: theme["ghost"], 2: "grey3"}
     t = Text()
@@ -281,8 +274,6 @@ def status_line(theme: dict, mode: str, tokens: int, budget: int,
     return t
 
 
-# ------------------------------------------------------------- thinking
-
 class ThinkingStatus:
     """A live, self-animating status line shown while the model works.
 
@@ -325,8 +316,6 @@ class ThinkingStatus:
         lines.append(Text(f"  ⎿ Tip: {self.tip}", style="dim"))
         return Group(*lines)
 
-
-# ----------------------------------------------------------------- prefs
 
 def load_prefs() -> dict:
     if PREFS.exists():

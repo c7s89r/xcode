@@ -27,7 +27,6 @@ from .permissions import Permissions
 
 console = Console()
 
-# (command, description) — drives both /help and the slash-completion dropdown.
 COMMANDS = [
     ("/help", "Show available commands"),
     ("/model", "Switch the active model"),
@@ -51,8 +50,6 @@ HELP = "Commands:\n" + "\n".join(
 ) + "\n\nType a request to work. Use @path to attach files."
 
 
-# ----------------------------------------------------------------- UI glue
-
 class UI:
     def __init__(self, backend, perms: Permissions, theme: dict,
                  mode: str = "normal", quiet: bool = False,
@@ -60,17 +57,15 @@ class UI:
         self.backend = backend
         self.perms = perms
         self.theme = theme
-        self.mode = mode              # "normal" | "auto"
-        self.quiet = quiet            # headless: suppress chatter
-        self.auto_allow = auto_allow  # headless --yes
-        self.last_file = None         # shown on the right of the input bar
+        self.mode = mode
+        self.quiet = quiet
+        self.auto_allow = auto_allow
+        self.last_file = None
         self._streaming = False
-        # live "✻ Envisioning…" spinner state
-        self._think = None            # ui.ThinkingStatus
-        self._live = None             # rich.live.Live
-        self._partial = ""            # current unfinished line of the reply
+        self._think = None
+        self._live = None
+        self._partial = ""
 
-    # ---- the Claude-Code-style thinking spinner ---------------------------
     def _live_ok(self) -> bool:
         return not self.quiet and console.is_terminal
 
@@ -93,7 +88,7 @@ class UI:
 
     def on_wait_end(self) -> None:
         if self._live is not None:
-            if self._partial:           # flush the last, unfinished line
+            if self._partial:
                 self._live.console.print(self._partial, style="white",
                                          highlight=False)
                 self._partial = ""
@@ -103,7 +98,6 @@ class UI:
         self._streaming = False
 
     def on_token(self, text: str) -> None:
-        # Live mode: stream finished lines above the pinned spinner.
         if self._live is not None:
             if self._think is not None:
                 self._think.tokens += max(1, len(text) // 4)
@@ -113,8 +107,6 @@ class UI:
                 self._live.console.print(line, style="white", highlight=False)
             self._live.update(self._live_render())
             return
-        # Fallback (headless / no TTY): plain inline streaming.
-        # Also used for command output streaming
         self._streaming = True
         console.print(text, end="", style="white", highlight=False)
         console.file.flush()
@@ -132,16 +124,14 @@ class UI:
         verb, target = _friendly(name, args)
         console.print(f"[{self.theme['accent']}]●[/] [bold]{escape(verb)}[/]"
                       f"([{self.theme['user']}]{escape(target)}[/])")
-        # For run_command, add a visual separator before streaming output
         if name == "run_command":
             console.print(f"  [{self.theme['tool']}]┌─ output ─[/]")
 
     def on_tool_result(self, name: str, args: dict, result: str) -> None:
         if self.quiet or name == "update_todos":
             return
-        if name == "ask_user":            # the menu already showed the Q&A
+        if name == "ask_user":
             return
-        # For run_command, output was already streamed, just show summary
         if name == "run_command":
             summary, ok = _summary(name, result)
             glyph = "[green]⎿[/]" if ok else "[red]⎿[/]"
@@ -164,24 +154,21 @@ class UI:
 
     def on_ask(self, question: str, options: list) -> str:
         options = [str(o) for o in options if str(o).strip()]
-        if self.quiet or not options:        # headless: take the first option
+        if self.quiet or not options:
             return options[0] if options else ""
         choice = input_bar.select_menu(question, options)
-        # Record the Q&A in scrollback (the menu itself erases on exit).
         console.print(f"[{self.theme['accent']}]●[/] {escape(question)}")
         console.print(f"  [{self.theme['user']}]❯ {escape(choice)}[/]")
         return choice
 
     def confirm(self, kind: str, target: str, detail: str) -> bool:
         if self.auto_allow or self.mode == "auto" or self.perms.is_allowed(kind, target):
-            return True  # silent — the ● header + mode bar already show intent
+            return True
 
-        # Plan mode: explore but make no changes.
         if self.mode == "plan":
             console.print(f"[dim yellow]· plan mode — skipping {kind}[/]")
             return False
 
-        # Headless/non-interactive: never block on a prompt — deny mutations.
         if self.quiet:
             console.print(f"[dim yellow]· denied ({kind}); pass --yes to allow[/]")
             return False
@@ -220,8 +207,6 @@ def _short(v, n: int = 60) -> str:
     s = str(v).replace("\n", " ")
     return s if len(s) <= n else s[:n] + "…"
 
-
-# ---- Claude-Code-style tool rendering ----------------------------------
 
 def _friendly(name: str, args: dict) -> tuple[str, str]:
     """Map a tool call to a (Verb, target) pair for the ● header line."""
@@ -349,8 +334,6 @@ def _render_todos(todos: list, theme: dict) -> None:
                         border_style=theme["border"], expand=False, padding=(0, 1)))
 
 
-# ------------------------------------------------------------ @file mentions
-
 _MENTION = re.compile(r"@([^\s]+)")
 
 
@@ -368,8 +351,6 @@ def _expand_mentions(text: str) -> str:
         return text
     return text + "\n\n[Attached files]\n" + "\n\n".join(attached)
 
-
-# ----------------------------------------------------------------- builders
 
 def _make_agent(uic: UI, settings=None, mcp=None) -> Agent:
     return Agent(uic.backend, confirm=uic.confirm, on_token=uic.on_token,
@@ -392,15 +373,12 @@ def _pick_model(uic: UI) -> None:
     choice = input_bar.select_menu("Switch model", options)
     if not choice:
         return
-    # Strip the current-model checkmark we may have appended to the label.
     picked = choice[:-2] if choice.endswith(" ✓") else choice
     if picked == uic.backend.model:
         return
     uic.backend.model = picked
     console.print(f"[green]switched to[/] {uic.backend.model}")
 
-
-# ----------------------------------------------------------------- headless
 
 def _run_headless(args) -> int:
     try:
@@ -431,8 +409,6 @@ def _run_headless(args) -> int:
     return 0
 
 
-# ----------------------------------------------------------------- REPL
-
 def _run_repl(args) -> int:
     try:
         backend = detect_backend()
@@ -450,9 +426,6 @@ def _run_repl(args) -> int:
     uic = UI(backend, perms, theme, mode=prefs.get("mode", "normal"))
 
     mcp = mcp_mod.McpManager()
-    # Don't connect MCP on startup - lazy load when needed
-    # mcp.connect_all(settings.data.get("mcpServers", {}),
-    #                 on_status=lambda s: console.print(f"[dim]· {s}[/]"))
 
     agent = _make_agent(uic, settings=settings, mcp=mcp)
     session_id = None
@@ -480,7 +453,7 @@ def _run_repl(args) -> int:
                           f"({len(data['messages'])} msgs)\n")
 
     while True:
-        if not input_bar.AVAILABLE:  # plain fallback shows a status line
+        if not input_bar.AVAILABLE:
             console.print(ui.status_line(theme, uic.mode, agent.context_tokens(),
                                          CONTEXT_TOKENS, backend.model))
             console.rule(style=theme["border"])
@@ -492,7 +465,6 @@ def _run_repl(args) -> int:
         if not raw:
             continue
 
-        # ---- slash commands ----
         if raw in ("/exit", "/quit"):
             console.print("[dim]bye 👻[/]"); break
         if raw == "/help":
@@ -568,7 +540,6 @@ def _run_repl(args) -> int:
         if raw == "/init":
             raw = memory.INIT_INSTRUCTION
 
-        # ---- a real request ----
         try:
             agent.send(_expand_mentions(raw))
             session_id = session.save(agent.messages, backend.model, session_id)

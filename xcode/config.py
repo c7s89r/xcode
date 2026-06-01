@@ -6,11 +6,9 @@ import os
 
 MAX_AGENT_STEPS = int(os.getenv("XCODE_MAX_STEPS", "25"))
 
-# Context budget (in estimated tokens) before we auto-summarize old turns.
-# Local models often have small windows, so default conservatively.
 CONTEXT_TOKENS = int(os.getenv("XCODE_CONTEXT_TOKENS", "8000"))
-COMPACT_AT = float(os.getenv("XCODE_COMPACT_AT", "0.75"))   # fraction of budget
-KEEP_RECENT = int(os.getenv("XCODE_KEEP_RECENT", "8"))      # msgs kept verbatim
+COMPACT_AT = float(os.getenv("XCODE_COMPACT_AT", "0.75"))
+KEEP_RECENT = int(os.getenv("XCODE_KEEP_RECENT", "8"))
 
 
 def estimate_tokens(messages: list[dict]) -> int:

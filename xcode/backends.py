@@ -13,14 +13,11 @@ from dataclasses import dataclass
 import httpx
 from openai import OpenAI
 
-# (label, base_url-without-/v1, how-to-list-models)
 _CANDIDATES = [
     ("ollama", "http://localhost:11434", "/api/tags"),
     ("llama.cpp", "http://localhost:8080", "/v1/models"),
 ]
 
-# Substrings (in priority order) of models that tend to be good at tool-calling.
-# Used to pick a sensible default instead of just grabbing the first model.
 _PREFERRED = [
     "qwen2.5-coder", "qwen3-coder", "qwen2.5", "qwen3",
     "llama3.1", "llama3.3", "mistral-nemo", "mistral", "deepseek-coder",
@@ -38,8 +35,8 @@ def _pick_default(models: list[str]) -> str:
 
 @dataclass
 class Backend:
-    name: str          # "ollama" | "llama.cpp"
-    base_url: str      # e.g. http://localhost:11434/v1
+    name: str
+    base_url: str
     model: str
     client: OpenAI
 
@@ -48,20 +45,20 @@ class Backend:
 
 
 def _list_ollama_models(root: str) -> list[str]:
-    r = httpx.get(f"{root}/api/tags", timeout=1.0)  # Reduced from 2.0s
+    r = httpx.get(f"{root}/api/tags", timeout=1.0)
     r.raise_for_status()
     return [m["name"] for m in r.json().get("models", [])]
 
 
 def _list_openai_models(root: str) -> list[str]:
-    r = httpx.get(f"{root}/v1/models", timeout=1.0)  # Reduced from 2.0s
+    r = httpx.get(f"{root}/v1/models", timeout=1.0)
     r.raise_for_status()
     return [m["id"] for m in r.json().get("data", [])]
 
 
 def _probe(root: str) -> bool:
     try:
-        httpx.get(root, timeout=0.5)  # Reduced from 1.5s to 0.5s
+        httpx.get(root, timeout=0.5)
         return True
     except Exception:
         return False
@@ -86,7 +83,6 @@ def detect_backend() -> Backend:
                        OpenAI(base_url=base_url, api_key=api_key))
 
     errors = []
-    # Try candidates in parallel for speed
     for name, root, _ in _CANDIDATES:
         if not _probe(root):
             errors.append(f"  - {name}: nothing listening at {root}")
@@ -96,7 +92,7 @@ def detect_backend() -> Backend:
                 models = _list_ollama_models(root)
             else:
                 models = _list_openai_models(root)
-        except Exception as e:  # responded but couldn't list models
+        except Exception as e:
             errors.append(f"  - {name}: reachable but model list failed ({e})")
             continue
 

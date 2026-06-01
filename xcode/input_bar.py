@@ -34,8 +34,6 @@ _LABEL = {
     "plan":   ("◷ plan", "read-only, no changes"),
 }
 
-# Faded "ghost" tips shown inside the empty prompt — they rotate each turn and
-# vanish the moment you start typing.
 PLACEHOLDERS = [
     'Try "fix typecheck errors"',
     'Try "how does <filepath> work?"',
@@ -65,7 +63,7 @@ try:
     from prompt_toolkit.layout.controls import FormattedTextControl
     from prompt_toolkit.styles import Style
     AVAILABLE = True
-except Exception:  # pragma: no cover
+except Exception:
     AVAILABLE = False
 
 
@@ -81,7 +79,7 @@ def _enable_shift_enter() -> None:
         from prompt_toolkit.input.win32 import ConsoleInputReader
         from prompt_toolkit.keys import Keys
     except Exception:
-        return  # not on Windows / no win32 reader — nothing to patch
+        return
     orig = ConsoleInputReader._event_to_key_presses
     if getattr(orig, "_xcode_patched", False):
         return
@@ -112,7 +110,7 @@ if AVAILABLE:
         """Claude-Code-style dropdown: type `/` to see commands + descriptions."""
 
         def __init__(self, commands):
-            self.commands = commands  # list of (name, description)
+            self.commands = commands
 
         def get_completions(self, document, complete_event):
             text = document.text_before_cursor
@@ -122,7 +120,7 @@ if AVAILABLE:
                 if name.startswith(text):
                     yield Completion(name, start_position=-len(text),
                                      display=name, display_meta=desc)
-else:  # pragma: no cover
+else:
     SlashCompleter = None
 
 
@@ -147,7 +145,7 @@ def select_menu(question: str, options: list) -> str:
         return ""
     labels = [lbl for lbl, _ in norm]
 
-    if not AVAILABLE:  # plain numbered fallback
+    if not AVAILABLE:
         print(question)
         for i, (lbl, desc) in enumerate(norm, 1):
             print(f"  {i}. {lbl}" + (f"  — {desc}" if desc else ""))
@@ -235,18 +233,18 @@ class InputBar:
         self.budget = 8000
         self.model = ""
         self.tokens = lambda: 0
-        self._ph_text = ""          # current ghost placeholder (sizes the top rule)
+        self._ph_text = ""
         self._session = None
         if AVAILABLE:
             try:
                 self._build()
             except Exception:
-                self._session = None  # not a real console → plain fallback
+                self._session = None
 
     def _build(self) -> None:
         kb = KeyBindings()
 
-        @kb.add("s-tab")  # shift+tab cycles the mode live
+        @kb.add("s-tab")
         def _(event):
             self.uic.mode = cycle(self.uic.mode)
             self.on_mode_change(self.uic.mode)
@@ -256,11 +254,11 @@ class InputBar:
         def _(event):
             event.app.exit(exception=KeyboardInterrupt)
 
-        @kb.add("c-z")  # undo the last edit in the input
+        @kb.add("c-z")
         def _(event):
             event.current_buffer.undo()
 
-        @kb.add("c-j")  # Shift+Enter (remapped) / Ctrl+J → newline, not submit
+        @kb.add("c-j")
         def _(event):
             event.current_buffer.insert_text("\n")
 
@@ -276,8 +274,6 @@ class InputBar:
             bottom_toolbar=self._toolbar,
             completer=SlashCompleter(self.commands) if SlashCompleter else None,
             complete_while_typing=True,
-            # Don't reserve a tall blank block for the completion dropdown —
-            # that's what left all those empty lines under the prompt.
             reserve_space_for_menu=0)
         self._compact_layout()
 
@@ -305,17 +301,13 @@ class InputBar:
         except Exception:
             pass
 
-    # ---- the top rule + prompt --------------------------------------------
     def _message(self):
-        # Rule fits the prompt line: "❯ " + the ghost placeholder. NOT full
-        # width — see the module docstring; do not change this back.
         prompt_line = "❯ " + (self._ph_text or "")
         return FormattedText([
             ("fg:ansibrightblack", _rule(prompt_line) + "\n"),
             ("bold fg:ansiwhite", "❯ "),
         ])
 
-    # ---- the bottom rule + status line ------------------------------------
     def _toolbar(self):
         label, _hint = _LABEL.get(self.uic.mode, _LABEL["normal"])
         seg_mode = f"  {label} mode on (shift+tab to cycle)"
@@ -325,7 +317,6 @@ class InputBar:
         tok = f"{n:,} tokens"
         fname = getattr(self.uic, "last_file", None)
         hint = "  ·  ⇧⏎ newline"
-        # Pack the segments together with small separators — no big pad gap.
         right = "  ·  " + (f"⧉ {fname}  ·  " if fname else "") + tok + hint
         status_line = seg_mode + seg_agents + right
 
@@ -336,17 +327,14 @@ class InputBar:
             ("fg:ansibrightblack", right),
         ])
 
-    # ---- ask ---------------------------------------------------------------
     def ask(self, model: str, tokens_fn, budget: int) -> str:
         self.model = model
         self.tokens = tokens_fn
         self.budget = budget
         if self._session is not None:
-            # Pick the placeholder now so the top rule can size itself to it.
             self._ph_text = random.choice(PLACEHOLDERS)
             ph = FormattedText([("fg:ansibrightblack", self._ph_text)])
             return self._session.prompt(placeholder=ph).strip()
-        # Fallback: plain prompt with simple rules, also fit to the words.
         self._ph_text = random.choice(PLACEHOLDERS)
         rule = _rule("❯ " + self._ph_text)
         print(rule)

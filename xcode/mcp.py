@@ -34,7 +34,6 @@ class McpClient:
             stderr=subprocess.DEVNULL, text=True, bufsize=1, env=_merged_env(env))
         threading.Thread(target=self._reader, daemon=True).start()
 
-    # ---- lifecycle ---------------------------------------------------------
     def initialize(self) -> None:
         self._request("initialize", {
             "protocolVersion": PROTOCOL,
@@ -64,9 +63,8 @@ class McpClient:
         except Exception:
             pass
 
-    # ---- transport ---------------------------------------------------------
     def _reader(self) -> None:
-        for line in self.proc.stdout:  # type: ignore[union-attr]
+        for line in self.proc.stdout:
             line = line.strip()
             if not line:
                 continue
@@ -76,8 +74,8 @@ class McpClient:
                 continue
 
     def _send(self, obj: dict) -> None:
-        self.proc.stdin.write(json.dumps(obj) + "\n")  # type: ignore[union-attr]
-        self.proc.stdin.flush()                          # type: ignore[union-attr]
+        self.proc.stdin.write(json.dumps(obj) + "\n")
+        self.proc.stdin.flush()
 
     def _notify(self, method: str, params: dict) -> None:
         self._send({"jsonrpc": "2.0", "method": method, "params": params})
@@ -86,7 +84,6 @@ class McpClient:
         self._id += 1
         rid = self._id
         self._send({"jsonrpc": "2.0", "id": rid, "method": method, "params": params})
-        # Drain until we see the matching response (skip notifications/logs).
         while True:
             try:
                 msg = self._inbox.get(timeout=timeout)

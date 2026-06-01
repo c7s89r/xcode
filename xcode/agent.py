@@ -14,17 +14,16 @@ from .config import (COMPACT_AT, CONTEXT_TOKENS, KEEP_RECENT, MAX_AGENT_STEPS,
                      SYSTEM_PROMPT, estimate_tokens)
 from . import tools
 
-# Hooks the CLI provides so the agent stays UI-agnostic.
-Confirm = Callable[[str, str, str], bool]   # (kind, target, detail) -> allow?
-OnToken = Callable[[str], None]             # streamed assistant text delta
-OnTurnEnd = Callable[[], None]              # assistant text turn finished
-OnTool = Callable[[str, dict], None]        # (tool_name, args) about to run
-OnToolResult = Callable[[str, dict, str], None]  # (tool_name, args, result) done
-OnTodos = Callable[[list], None]            # the todo list changed
-OnNotice = Callable[[str], None]            # out-of-band status line
-OnAsk = Callable[[str, list], str]          # (question, options) -> chosen
-OnWaitStart = Callable[[], None]            # model call started — show spinner
-OnWaitEnd = Callable[[], None]              # model call produced output — hide it
+Confirm = Callable[[str, str, str], bool]
+OnToken = Callable[[str], None]
+OnTurnEnd = Callable[[], None]
+OnTool = Callable[[str, dict], None]
+OnToolResult = Callable[[str, dict, str], None]
+OnTodos = Callable[[list], None]
+OnNotice = Callable[[str], None]
+OnAsk = Callable[[str, list], str]
+OnWaitStart = Callable[[], None]
+OnWaitEnd = Callable[[], None]
 
 
 class Agent:
@@ -50,13 +49,12 @@ class Agent:
         self.on_wait_start = on_wait_start or (lambda: None)
         self.on_wait_end = on_wait_end or (lambda: None)
         self.project_memory = project_memory
-        self.settings = settings          # hooks.Settings or None
-        self.mcp = mcp                    # mcp.McpManager or None
-        self.depth = depth                # 0 = top-level; children are deeper
+        self.settings = settings
+        self.mcp = mcp
+        self.depth = depth
         self.todos: list[dict] = []
         self.messages: list[dict] = [self._system()]
 
-    # ---- public ------------------------------------------------------------
     def reset(self) -> None:
         self.messages = [self._system()]
         self.todos = []
@@ -107,7 +105,6 @@ class Agent:
         self.on_token("\n[stopped: hit the max step limit for this turn]")
         self.on_turn_end()
 
-    # ---- internals ---------------------------------------------------------
     def _system(self) -> dict:
         content = SYSTEM_PROMPT
         if self.project_memory:
@@ -129,7 +126,6 @@ class Agent:
         if self.mcp and self.mcp.handles(name):
             return self.mcp.call(name, args)
 
-        # Pass streaming callback for run_command
         if name == "run_command":
             result = tools.dispatch(name, args, self.confirm, on_output=self.on_token)
         else:
@@ -174,7 +170,7 @@ class Agent:
 
     def _schemas(self) -> list[dict]:
         schemas = list(tools.TOOL_SCHEMAS)
-        if self.depth >= 1:  # children can't spawn further
+        if self.depth >= 1:
             schemas = [s for s in schemas
                        if s["function"]["name"] != "spawn_agent"]
         if self.mcp:
@@ -209,7 +205,7 @@ class Agent:
                     printed_any = True
 
                 for tc in (getattr(delta, "tool_calls", None) or []):
-                    if waiting:           # first tool token: drop the spinner
+                    if waiting:
                         self.on_wait_end(); waiting = False
                     slot = calls.setdefault(tc.index,
                                             {"id": "", "name": "", "arguments": ""})
@@ -241,12 +237,10 @@ class Agent:
         if not force and estimate_tokens(self.messages) < budget * COMPACT_AT:
             return False
 
-        body = self.messages[1:]  # everything after system
+        body = self.messages[1:]
         if len(body) <= KEEP_RECENT:
             return False
 
-        # Snap the split to a clean user-turn boundary so we never orphan a
-        # tool result from its assistant tool_call.
         split = max(0, len(body) - KEEP_RECENT)
         while split < len(body) and body[split]["role"] != "user":
             split += 1
@@ -297,7 +291,7 @@ def _normalize_todos(raw) -> list[dict]:
             raw = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
             raw = [raw]
-    if isinstance(raw, dict):           # single todo, or {"todos": [...]}
+    if isinstance(raw, dict):
         raw = raw.get("todos", [raw]) if "todos" in raw else [raw]
     out = []
     for item in raw or []:

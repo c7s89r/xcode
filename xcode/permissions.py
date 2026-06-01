@@ -15,11 +15,10 @@ STORE = Path(".xcode") / "permissions.json"
 class Permissions:
     def __init__(self, store: Path = STORE):
         self.store = store
-        self.tools: set[str] = set()        # tool kinds always allowed wholesale
-        self.cmd_prefixes: set[str] = set()  # command first-words always allowed
+        self.tools: set[str] = set()
+        self.cmd_prefixes: set[str] = set()
         self._load()
 
-    # ---- queries -----------------------------------------------------------
     def is_allowed(self, kind: str, target: str) -> bool:
         if kind in self.tools:
             return True
@@ -28,7 +27,6 @@ class Permissions:
             return head in self.cmd_prefixes
         return False
 
-    # ---- mutations ---------------------------------------------------------
     def allow_kind(self, kind: str) -> None:
         self.tools.add(kind)
         self._save()
@@ -53,7 +51,6 @@ class Permissions:
             parts.append("commands: " + ", ".join(sorted(self.cmd_prefixes)))
         return " · ".join(parts) or "(none yet)"
 
-    # ---- persistence -------------------------------------------------------
     def _load(self) -> None:
         if not self.store.exists():
             return
@@ -62,7 +59,7 @@ class Permissions:
             self.tools = set(data.get("tools", []))
             self.cmd_prefixes = set(data.get("cmd_prefixes", []))
         except Exception:
-            pass  # corrupt store: start clean, don't crash
+            pass
 
     def _save(self) -> None:
         try:
