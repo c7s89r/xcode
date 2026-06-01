@@ -37,6 +37,40 @@ pip install -e .
 
 (Python 3.9+. Pulls in `openai`, `httpx`, `rich`.)
 
+### `xcoding: command not found` after installing?
+
+Install worked, but your shell can't find the command? This almost always
+means pip put the `xcoding` launcher in its **Scripts** folder, which isn't on
+your `PATH`. (Having `python` on PATH is **not** the same thing — the launcher
+lives in a separate directory.) pip usually prints a warning about this during
+install, e.g. *"The script xcoding.exe is installed in '...\Scripts' which is
+not on PATH."*
+
+Two ways to fix it:
+
+1. **Just run it as a module** (works whenever `python` is on PATH):
+
+   ```bash
+   python -m xcode
+   ```
+
+2. **Put pip's scripts folder on PATH.** Find where it is:
+
+   ```bash
+   pip show -f xcoding                                          # lists installed files
+   python -c "import sysconfig; print(sysconfig.get_path('scripts'))"
+   ```
+
+   Add that printed folder to your `PATH`, then open a new terminal. Typical
+   locations:
+
+   - **Windows:** `%APPDATA%\Python\Python3X\Scripts` (user install) or
+     `...\PythonXX\Scripts` next to `python.exe`
+   - **macOS/Linux:** `~/.local/bin`
+
+   On Windows you can also reinstall without `--user` so the launcher lands
+   next to `python.exe`, or use `py -m pip install xcoding`.
+
 ## Run a backend
 
 **Ollama** (easiest — supports tool-calling natively):
