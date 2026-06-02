@@ -13,6 +13,8 @@ from dataclasses import dataclass
 import httpx
 from openai import OpenAI
 
+from . import providers
+
 _CANDIDATES = [
     ("ollama", "http://localhost:11434", "/api/tags"),
     ("llama.cpp", "http://localhost:8080", "/v1/models"),
@@ -97,6 +99,14 @@ def detect_backend(allow_missing: bool = False) -> Backend:
         return Backend("custom", base_url, model,
                        OpenAI(base_url=base_url, api_key=api_key))
 
+    cfg = providers.load_config()
+    chosen = os.getenv("XCODE_PROVIDER") or cfg.get("provider")
+    if chosen and chosen in providers.PROVIDERS \
+            and not providers.PROVIDERS[chosen].get("local"):
+        bk = build_provider_backend(chosen, forced_model, cfg)
+        if bk is not None:
+            return bk
+
     errors = []
     for name, root, _ in _CANDIDATES:
         if not _probe(root):
@@ -126,13 +136,29 @@ def detect_backend(allow_missing: bool = False) -> Backend:
         + "\n\nStart one of:\n"
         "  Ollama   : `ollama serve` then `ollama pull qwen2.5-coder`\n"
         "  llama.cpp: `llama-server -m model.gguf` (listens on :8080)\n"
-        "Or set XCODE_BASE_URL to any OpenAI-compatible endpoint."
+        "Or use a cloud API: type /provider (Claude, OpenAI, Groq, and more),\n"
+        "or set XCODE_BASE_URL to any OpenAI-compatible endpoint."
     )
     if allow_missing:
         return Backend("none", "", "(no model)",
                        OpenAI(base_url="http://localhost:11434/v1", api_key=api_key),
                        available=False, note=message)
     raise RuntimeError(message)
+
+
+def build_provider_backend(name: str, forced_model: str | None = None,
+                           cfg: dict | None = None) -> Backend | None:
+    p = providers.PROVIDERS.get(name)
+    if not p:
+        return None
+    cfg = cfg if cfg is not None else providers.load_config()
+    key = providers.get_key(name, cfg) or os.getenv("XCODE_API_KEY")
+    if p.get("key_env") and not key:
+        return None
+    base_url = p["base_url"].rstrip("/")
+    model = forced_model or cfg.get("model") or p.get("default") or "gpt-4o"
+    return Backend(name, base_url, model,
+                   OpenAI(base_url=base_url, api_key=key or "local"))
 
 
 def _first_model_at(base_url: str) -> str | None:

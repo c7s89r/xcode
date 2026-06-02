@@ -108,6 +108,38 @@ llama-server -m your-model.gguf   # listens on :8080, OpenAI-compatible
 > Tool-calling quality depends heavily on the model. Use a model trained for it
 > (e.g. `qwen2.5-coder`, `llama3.1`, `mistral-nemo`). Tiny models will struggle.
 
+## Cloud APIs (Claude, OpenAI, and more)
+
+Prefer a hosted model? xcode talks to any OpenAI-compatible API, with presets
+for the big providers. Inside xcode, just run **`/provider`** and pick one — it
+asks for your API key once, saves it to `~/.xcode/config.json`, and switches
+over. Switch back to local anytime with `/provider ollama`.
+
+Built-in providers: **anthropic** (Claude), **openai** (GPT), **openrouter**,
+**groq**, **deepseek**, **mistral**, **together**, **xai** (Grok),
+**gemini**, plus local **ollama** / **llamacpp**.
+
+```
+/provider                 browse and pick a provider
+/provider openai          switch to a provider (prompts for a key if needed)
+/key openai sk-…          save an API key without the prompt
+/model gpt-4o-mini        set the exact model name for the active provider
+```
+
+Or configure it with env vars (no in-app step):
+
+```bash
+export XCODE_PROVIDER=anthropic
+export ANTHROPIC_API_KEY=sk-ant-…
+# optional: export XCODE_MODEL=claude-sonnet-4-5
+```
+
+> **Heads-up on billing:** an API key is **not** the same as a Claude Pro or
+> ChatGPT Plus subscription. The API is billed separately, pay-as-you-go —
+> get a key at [console.anthropic.com](https://console.anthropic.com/settings/keys)
+> or [platform.openai.com](https://platform.openai.com/api-keys). A Pro/Plus
+> plan alone won't authenticate the API.
+
 ## Use it
 
 ```bash

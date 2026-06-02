@@ -19,7 +19,8 @@ from rich.panel import Panel
 from rich.text import Text
 
 from .agent import Agent
-from .backends import detect_backend, list_models
+from .backends import detect_backend, list_models, build_provider_backend
+from . import providers
 from .config import CONTEXT_TOKENS
 from . import (memory, session, ui, hooks as hooks_mod, mcp as mcp_mod,
                input_bar, tools as tools_mod, update as update_mod)
@@ -29,7 +30,9 @@ console = Console()
 
 COMMANDS = [
     ("/help", "Show available commands"),
-    ("/model", "Switch the active model"),
+    ("/provider", "Switch backend: local, Claude, OpenAI, Groq, …"),
+    ("/key", "Save an API key (/key openai sk-…)"),
+    ("/model", "Switch the active model (or /model <name>)"),
     ("/models", "List models on reachable backends"),
     ("/auto", "Toggle auto mode (run & write without asking)"),
     ("/theme", "Switch color theme (/theme to list them)"),
@@ -448,6 +451,52 @@ def _make_agent(uic: UI, settings=None, mcp=None) -> Agent:
                  project_memory=memory.load(), settings=settings, mcp=mcp)
 
 
+def _activate_provider(name: str, backend) -> None:
+    p = providers.PROVIDERS.get(name)
+    if not p:
+        console.print(f"[yellow]unknown provider '{name}'[/] — "
+                      f"try one of: {', '.join(providers.PROVIDERS)}")
+        return
+    if p.get("local"):
+        providers.clear_active()
+        try:
+            backend.adopt(detect_backend())
+            console.print(f"[green]switched to[/] {backend.describe()}")
+        except RuntimeError as e:
+            console.print(f"[yellow]{e}[/]")
+        return
+    key = providers.get_key(name)
+    if not key:
+        if p.get("console"):
+            console.print(f"[dim]get a key: {p['console']}[/]")
+        try:
+            key = console.input(f"  paste your {p['label']} API key: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            console.print("[yellow]cancelled[/]"); return
+        if not key:
+            console.print("[yellow]no key — cancelled[/]"); return
+        providers.set_key(name, key)
+    providers.set_active(name)
+    bk = build_provider_backend(name)
+    if bk is None:
+        console.print("[yellow]could not configure that provider[/]"); return
+    backend.adopt(bk)
+    console.print(f"[green]connected[/] {backend.describe()}")
+    console.print(f"[dim]model: {backend.model} — change it with /model <name>[/]")
+
+
+def _provider_menu(backend) -> None:
+    cur = providers.load_config().get("provider", "")
+    options = []
+    for name, p in providers.PROVIDERS.items():
+        label = name + ("  ✓" if name == cur else "")
+        options.append((label, p["label"]))
+    choice = input_bar.select_menu("Choose a provider", options)
+    if not choice:
+        return
+    _activate_provider(choice.split()[0], backend)
+
+
 def _pick_model(uic: UI) -> None:
     options: list[tuple[str, str]] = []
     for name, models in list_models().items():
@@ -621,8 +670,31 @@ def _run_repl(args) -> int:
             mem = memory.load()
             console.print(mem if mem else "[dim]no XCODE.md found (run /init)[/]")
             continue
+        if raw.startswith("/model "):
+            name = raw.split(maxsplit=1)[1].strip()
+            uic.backend.model = name
+            cfg = providers.load_config()
+            if cfg.get("provider"):
+                cfg["model"] = name; providers.save_config(cfg)
+            console.print(f"[green]model set to[/] {name}"); continue
         if raw == "/model":
             _pick_model(uic); continue
+        if raw.startswith("/provider"):
+            parts = raw.split(maxsplit=1)
+            if len(parts) > 1:
+                _activate_provider(parts[1].strip(), backend)
+            else:
+                _provider_menu(backend)
+            continue
+        if raw.startswith("/key"):
+            parts = raw.split()
+            if len(parts) >= 3:
+                providers.set_key(parts[1], parts[2])
+                console.print(f"[green]saved API key for {parts[1]}[/]")
+            else:
+                console.print("usage: /key <provider> <api-key>   "
+                              f"(providers: {', '.join(providers.PROVIDERS)})")
+            continue
         if raw == "/todos":
             _render_todos(agent.todos, theme); continue
         if raw == "/perms":
