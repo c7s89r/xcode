@@ -20,7 +20,8 @@ from rich.panel import Panel
 from rich.text import Text
 
 from .agent import Agent
-from .backends import detect_backend, list_models, build_provider_backend
+from .backends import (detect_backend, list_models, build_provider_backend,
+                       Backend)
 from . import providers
 from .config import CONTEXT_TOKENS
 from . import (memory, session, ui, hooks as hooks_mod, mcp as mcp_mod,
@@ -633,13 +634,36 @@ def _update_gate() -> None:
         console.clear()
 
 
-def _run_repl(args) -> int:
-    _update_gate()
+def _startup_backend(args):
     if getattr(args, "local", False) or providers.use_embedded():
         booted = _boot_local()
-        backend = booted if booted is not None else detect_backend(allow_missing=True)
+        return booted if booted is not None else detect_backend(allow_missing=True)
+
+    cfg = providers.load_config()
+    if cfg.get("provider") or cfg.get("local_model"):
+        return detect_backend(allow_missing=True)
+
+    if embedded_mod.model_ready():
+        booted = _boot_local()
+        if booted is not None:
+            providers.remember_embedded()
+            return booted
     else:
-        backend = detect_backend(allow_missing=True)
+        probe = detect_backend(allow_missing=True)
+        if probe.available:
+            return probe
+        booted = _boot_local()
+        if booted is not None:
+            providers.remember_embedded()
+            return booted
+        return probe
+
+    return detect_backend(allow_missing=True)
+
+
+def _run_repl(args) -> int:
+    _update_gate()
+    backend = _startup_backend(args)
     if args.model:
         backend.model = args.model
 

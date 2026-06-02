@@ -238,10 +238,20 @@ def logo(theme: dict, width: int = 26) -> Text:
     return t
 
 
+def _short_version() -> str:
+    try:
+        import importlib.metadata as m
+        return ".".join(m.version("xcoding").split(".")[:2])
+    except Exception:
+        return ""
+
+
 def welcome(theme: dict, model: str, cwd: str, notes: str = "") -> Panel:
     """Landscape welcome card: ghost on the left, info on the right."""
+    ver = _short_version()
+    title = f"xcode {ver}" if ver else "xcode"
     info = Group(
-        Text("xcode", style=theme["title"]),
+        Text(title, style=theme["title"]),
         Text("local-model coding agent", style=theme["tool"]),
         Text(""),
         Text(model, style=theme["accent"]),

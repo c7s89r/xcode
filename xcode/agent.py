@@ -55,6 +55,7 @@ class Agent:
         self.depth = depth
         self.todos: list[dict] = []
         self.interrupted = False
+        self.supports_tools = True
         self.messages: list[dict] = [self._system()]
 
     def reset(self) -> None:
@@ -183,17 +184,32 @@ class Agent:
             schemas += self.mcp.schemas()
         return schemas
 
+    def _open_stream(self, with_tools: bool):
+        kwargs = dict(model=self.backend.model, messages=self.messages,
+                      temperature=0.2, stream=True)
+        if with_tools:
+            kwargs["tools"] = self._schemas()
+        return self.backend.client.chat.completions.create(**kwargs)
+
     def _stream_once(self):
         """One streamed model call. Returns (content, tool_calls list)."""
         self.on_wait_start()
         waiting = True
-        stream = self.backend.client.chat.completions.create(
-            model=self.backend.model,
-            messages=self.messages,
-            tools=self._schemas(),
-            temperature=0.2,
-            stream=True,
-        )
+        try:
+            stream = self._open_stream(self.supports_tools)
+        except Exception as e:
+            if self.supports_tools and _tools_unsupported(e):
+                self.supports_tools = False
+                if waiting:
+                    self.on_wait_end(); waiting = False
+                self.on_notice("this model doesn't support tools — "
+                               "chatting without them (switch with /model or /provider)")
+                self.on_wait_start(); waiting = True
+                stream = self._open_stream(False)
+            else:
+                if waiting:
+                    self.on_wait_end()
+                raise
 
         content_parts: list[str] = []
         calls: dict[int, dict] = {}
@@ -340,6 +356,11 @@ def _render(msgs: list[dict]) -> str:
         elif role == "user":
             out.append(f"[user] {m.get('content','')}")
     return "\n".join(out)
+
+
+def _tools_unsupported(e: Exception) -> bool:
+    msg = str(e).lower()
+    return "does not support tools" in msg or "tools" in msg and "support" in msg
 
 
 def _parse_args(raw: str | None) -> dict:
