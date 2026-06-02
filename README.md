@@ -23,11 +23,30 @@ xcoding
 
 ## Install
 
+### One-liner (recommended — also fixes PATH for you)
+
+**Windows** (PowerShell):
+
+```powershell
+iex (irm https://raw.githubusercontent.com/c7s89r/xcode/main/install.ps1)
+```
+
+**Linux / macOS**:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/c7s89r/xcode/main/install.sh | bash
+```
+
+These detect your Python, install `xcoding`, and add pip's scripts folder to
+your `PATH` so `xcode` works in a new terminal — no "command not found".
+
+### With pip
+
 ```bash
 pip install xcoding
 ```
 
-Then just run `xcoding` from any project folder.
+Then run `xcode` (or `xcoding`) from any project folder.
 
 Or from source:
 
