@@ -23,13 +23,15 @@ from .backends import detect_backend, list_models, build_provider_backend
 from . import providers
 from .config import CONTEXT_TOKENS
 from . import (memory, session, ui, hooks as hooks_mod, mcp as mcp_mod,
-               input_bar, tools as tools_mod, update as update_mod)
+               input_bar, tools as tools_mod, update as update_mod,
+               embedded as embedded_mod)
 from .permissions import Permissions
 
 console = Console()
 
 COMMANDS = [
     ("/help", "Show available commands"),
+    ("/local", "Download & run a small built-in model (no setup)"),
     ("/provider", "Switch backend: local, Claude, OpenAI, Groq, …"),
     ("/key", "Save an API key (/key openai sk-…)"),
     ("/model", "Switch the active model (or /model <name>)"),
@@ -451,6 +453,51 @@ def _make_agent(uic: UI, settings=None, mcp=None) -> Agent:
                  project_memory=memory.load(), settings=settings, mcp=mcp)
 
 
+def _boot_local(existing=None):
+    from openai import OpenAI
+    from rich.progress import (Progress, BarColumn, DownloadColumn,
+                               TransferSpeedColumn, TextColumn)
+
+    if embedded_mod.is_up():
+        return Backend("local", embedded_mod.BASE_URL, embedded_mod.MODEL_ALIAS,
+                       OpenAI(base_url=embedded_mod.BASE_URL, api_key="local"))
+
+    if not embedded_mod.have_engine():
+        console.print("[bold]Setting up a built-in model[/] — no Ollama needed.")
+    if not embedded_mod.ensure_engine(log=lambda s: console.print(f"[dim]{s}[/]")):
+        return None
+
+    if not embedded_mod.model_ready():
+        console.print(f"[dim]downloading {embedded_mod.MODEL_FILE} "
+                      "(~2 GB, one time)…[/]")
+        with Progress(TextColumn("  [cyan]model[/]"), BarColumn(),
+                      DownloadColumn(), TransferSpeedColumn(),
+                      console=console, transient=True) as prog:
+            task = prog.add_task("download", total=None)
+
+            def on_progress(done, total):
+                prog.update(task, completed=done, total=total or None)
+
+            path = embedded_mod.ensure_model(progress=on_progress,
+                                             log=lambda s: console.print(f"[red]{s}[/]"))
+        if not path:
+            console.print("[yellow]model download failed.[/]")
+            return None
+        console.print("[green]model ready.[/]")
+
+    console.print("[dim]starting the local server…[/]")
+    if not embedded_mod.start_server(log=lambda s: console.print(f"[yellow]{s}[/]")):
+        return None
+
+    bk = Backend("local", embedded_mod.BASE_URL, embedded_mod.MODEL_ALIAS,
+                 OpenAI(base_url=embedded_mod.BASE_URL, api_key="local"))
+    if existing is not None:
+        existing.adopt(bk)
+        console.print(f"[green]running[/] {existing.describe()}")
+        return existing
+    return bk
+
+
 def _activate_provider(name: str, backend) -> None:
     p = providers.PROVIDERS.get(name)
     if not p:
@@ -575,7 +622,11 @@ def _update_gate() -> None:
 
 def _run_repl(args) -> int:
     _update_gate()
-    backend = detect_backend(allow_missing=True)
+    if getattr(args, "local", False):
+        booted = _boot_local()
+        backend = booted if booted is not None else detect_backend(allow_missing=True)
+    else:
+        backend = detect_backend(allow_missing=True)
     if args.model:
         backend.model = args.model
 
@@ -600,7 +651,9 @@ def _run_repl(args) -> int:
     console.print(ui.welcome(theme, backend.model, str(Path.cwd()), mem_note))
     if not backend.available:
         console.print(f"[yellow]{backend.note}[/]")
-        console.print("[dim]Start a model and just type — I'll connect when it's up.[/]")
+        console.print("[dim]No setup? Type [/][bold]/local[/][dim] to download a small "
+                      "built-in model and run it right here.[/]")
+        console.print("[dim]Or start a model and just type — I'll connect when it's up.[/]")
     console.print()
 
     def _save_mode(m):
@@ -679,6 +732,10 @@ def _run_repl(args) -> int:
             console.print(f"[green]model set to[/] {name}"); continue
         if raw == "/model":
             _pick_model(uic); continue
+        if raw in ("/local", "/try"):
+            providers.clear_active()
+            _boot_local(backend)
+            continue
         if raw.startswith("/provider"):
             parts = raw.split(maxsplit=1)
             if len(parts) > 1:
@@ -812,6 +869,8 @@ def main() -> None:
                         help="resume the most recent session")
     parser.add_argument("--yes", action="store_true",
                         help="headless: auto-approve writes/commands")
+    parser.add_argument("--local", action="store_true",
+                        help="download & run a small built-in model (no Ollama needed)")
     args = parser.parse_args()
 
     rc = _run_headless(args) if args.print else _run_repl(args)

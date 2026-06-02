@@ -12,6 +12,18 @@ It auto-detects whichever backend is running, gives the model tools to read/writ
 files and run shell commands, and loops until your task is done. Every file write
 and every shell command asks for your approval first.
 [![Watch the video](https://cdn-cf-east.streamable.com/image/rpw3lf.jpg)](https://streamable.com/rpw3lf)
+### Zero-setup (no Ollama, no API key)
+
+```bash
+pip install xcoding
+xcode --local
+```
+
+`--local` grabs a small, capable model (Qwen2.5-3B, ~2 GB, one-time download)
+and runs it **in-process** — no Ollama, no llama.cpp, no API key, nothing to
+configure. Great for just trying it out. You can also type `/local` from inside
+xcode anytime. (It pulls in the `llama-cpp-python` engine on first use.)
+
 ### Quick start (Ollama)
 
 ```bash
