@@ -26,25 +26,32 @@ def model_path() -> Path:
     return MODEL_DIR / MODEL_FILE
 
 
+_SERVER_DEPS = ("fastapi", "uvicorn", "starlette_context", "sse_starlette",
+                "pydantic_settings")
+
+
 def have_engine() -> bool:
-    try:
-        import llama_cpp
-        return bool(llama_cpp)
-    except Exception:
+    import importlib.util as u
+    if u.find_spec("llama_cpp") is None:
         return False
+    return all(u.find_spec(m) is not None for m in _SERVER_DEPS)
 
 
 def ensure_engine(log: Callable[[str], None] = print) -> bool:
     if have_engine():
         return True
     log("installing the local engine (llama-cpp-python) — one-time, may take a minute…")
-    rc = subprocess.call([sys.executable, "-m", "pip", "install", "--upgrade",
-                          "llama-cpp-python"])
-    if rc != 0 or not have_engine():
-        log("could not install llama-cpp-python automatically. "
-            "Try: pip install llama-cpp-python")
-        return False
-    return True
+    subprocess.call([sys.executable, "-m", "pip", "install", "--upgrade",
+                     "llama-cpp-python[server]"])
+    if have_engine():
+        return True
+    subprocess.call([sys.executable, "-m", "pip", "install", "--upgrade",
+                     *[d.replace("_", "-") for d in _SERVER_DEPS]])
+    if have_engine():
+        return True
+    log("could not install the local engine automatically. "
+        "Try: pip install 'llama-cpp-python[server]'")
+    return False
 
 
 def model_ready() -> bool:

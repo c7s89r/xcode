@@ -1,6 +1,6 @@
 [project]
 name = "xcoding"
-version = "0.1.9"
+version = "0.1.10"
 description = "xcoding by @c7s89r — a local-model coding agent. Claude Code, but powered by Ollama or llama.cpp."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-local = ["llama-cpp-python>=0.2.79"]
+local = ["llama-cpp-python[server]>=0.2.79"]
 
 [project.urls]
 Homepage = "https://github.com/c7s89r/xcode"
