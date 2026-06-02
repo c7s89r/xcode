@@ -13,10 +13,13 @@ from typing import Callable
 import httpx
 
 MODEL_DIR = Path.home() / ".xcode" / "models"
-MODEL_REPO = "Qwen/Qwen2.5-3B-Instruct-GGUF"
-MODEL_FILE = "qwen2.5-3b-instruct-q4_k_m.gguf"
-MODEL_ALIAS = "qwen2.5-3b (built-in)"
-MODEL_URL = f"https://huggingface.co/{MODEL_REPO}/resolve/main/{MODEL_FILE}"
+
+PRESETS = {
+    "tiny":  ("Qwen/Qwen2.5-0.5B-Instruct-GGUF", "qwen2.5-0.5b-instruct-q4_k_m.gguf", "qwen2.5-0.5b", "~0.4 GB"),
+    "small": ("Qwen/Qwen2.5-1.5B-Instruct-GGUF", "qwen2.5-1.5b-instruct-q4_k_m.gguf", "qwen2.5-1.5b", "~1 GB"),
+    "base":  ("Qwen/Qwen2.5-3B-Instruct-GGUF",   "qwen2.5-3b-instruct-q4_k_m.gguf",   "qwen2.5-3b",   "~2 GB"),
+}
+DEFAULT_PRESET = "base"
 
 PORT = int(os.getenv("XCODE_LOCAL_PORT", "8011"))
 BASE_URL = f"http://localhost:{PORT}/v1"
@@ -24,8 +27,38 @@ BASE_URL = f"http://localhost:{PORT}/v1"
 _proc: subprocess.Popen | None = None
 
 
+def _selected() -> tuple[str, str, str, str]:
+    sel = os.getenv("XCODE_LOCAL_MODEL", DEFAULT_PRESET).strip()
+    if sel in PRESETS:
+        return PRESETS[sel]
+    if "/" in sel and sel.endswith(".gguf"):
+        repo, file = sel.rsplit("/", 1)
+        return (repo, file, file[:-5], "")
+    return PRESETS[DEFAULT_PRESET]
+
+
+def model_repo() -> str:
+    return _selected()[0]
+
+
+def model_file() -> str:
+    return _selected()[1]
+
+
+def model_alias() -> str:
+    return f"{_selected()[2]} (built-in)"
+
+
+def model_size() -> str:
+    return _selected()[3]
+
+
+def model_url() -> str:
+    return f"https://huggingface.co/{model_repo()}/resolve/main/{model_file()}"
+
+
 def model_path() -> Path:
-    return MODEL_DIR / MODEL_FILE
+    return MODEL_DIR / model_file()
 
 
 _SERVER_DEPS = ("fastapi", "uvicorn", "starlette_context", "sse_starlette",
@@ -138,7 +171,7 @@ def ensure_model(progress: Callable[[int, int], None] | None = None,
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(".part")
     try:
-        with httpx.stream("GET", MODEL_URL, follow_redirects=True,
+        with httpx.stream("GET", model_url(), follow_redirects=True,
                           timeout=httpx.Timeout(60.0, read=None)) as r:
             r.raise_for_status()
             total = int(r.headers.get("content-length", 0))
@@ -179,7 +212,7 @@ def start_server(log: Callable[[str], None] = print) -> bool:
     _proc = subprocess.Popen(
         [sys.executable, "-m", "llama_cpp.server",
          "--model", str(model_path()),
-         "--model_alias", MODEL_ALIAS,
+         "--model_alias", model_alias(),
          "--n_ctx", ctx,
          "--n_gpu_layers", n_gpu_layers,
          "--chat_format", "chatml-function-calling",

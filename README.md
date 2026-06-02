@@ -19,10 +19,27 @@ pip install xcoding
 xcode --local
 ```
 
-`--local` grabs a small, capable model (Qwen2.5-3B, ~2 GB, one-time download)
-and runs it **in-process** — no Ollama, no llama.cpp, no API key, nothing to
-configure. Great for just trying it out. You can also type `/local` from inside
-xcode anytime.
+`--local` grabs a capable model and runs it **in-process** — no Ollama, no
+llama.cpp, no API key, nothing to configure. **Runs CPU-only** (no GPU needed).
+You can also type `/local` inside xcode.
+
+Pick a size for your machine (default is **base**):
+
+| size | model | download | notes |
+|------|-------|----------|-------|
+| `tiny`  | Qwen2.5-0.5B | ~0.4 GB | fastest; **chat only** — too small to use tools reliably |
+| `small` | Qwen2.5-1.5B | ~1 GB   | light; tool use is hit-or-miss |
+| `base`  | Qwen2.5-3B   | ~2 GB   | **default** — the smallest that reliably drives the agent (reads/edits files, runs commands) |
+
+```bash
+xcode --local                    # base (3B) by default — runs on CPU
+XCODE_LOCAL_MODEL=tiny xcode --local
+# or inside xcode:  /local tiny   ·   /local base
+```
+
+> The 3B is the floor for an agent that actually *uses tools*; smaller models
+> mostly just chat. The 3B still runs fine on a plain CPU (~2 GB RAM for the
+> weights) — just slower than on a GPU.
 
 It installs the right **prebuilt** engine for your machine automatically — no
 compiler needed:

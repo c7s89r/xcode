@@ -8,6 +8,7 @@ session save/resume, and a context meter.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
@@ -31,7 +32,7 @@ console = Console()
 
 COMMANDS = [
     ("/help", "Show available commands"),
-    ("/local", "Download & run a small built-in model (no setup)"),
+    ("/local", "Run a built-in model — /local tiny|small|base"),
     ("/provider", "Switch backend: local, Claude, OpenAI, Groq, …"),
     ("/key", "Save an API key (/key openai sk-…)"),
     ("/model", "Switch the active model (or /model <name>)"),
@@ -459,7 +460,7 @@ def _boot_local(existing=None):
                                TransferSpeedColumn, TextColumn)
 
     if embedded_mod.is_up():
-        return Backend("local", embedded_mod.BASE_URL, embedded_mod.MODEL_ALIAS,
+        return Backend("local", embedded_mod.BASE_URL, embedded_mod.model_alias(),
                        OpenAI(base_url=embedded_mod.BASE_URL, api_key="local"))
 
     if not embedded_mod.have_engine():
@@ -468,8 +469,8 @@ def _boot_local(existing=None):
         return None
 
     if not embedded_mod.model_ready():
-        console.print(f"[dim]downloading {embedded_mod.MODEL_FILE} "
-                      "(~2 GB, one time)…[/]")
+        console.print(f"[dim]downloading {embedded_mod.model_file()} "
+                      f"({embedded_mod.model_size()}, one time)…[/]")
         with Progress(TextColumn("  [cyan]model[/]"), BarColumn(),
                       DownloadColumn(), TransferSpeedColumn(),
                       console=console, transient=True) as prog:
@@ -489,7 +490,7 @@ def _boot_local(existing=None):
     if not embedded_mod.start_server(log=lambda s: console.print(f"[yellow]{s}[/]")):
         return None
 
-    bk = Backend("local", embedded_mod.BASE_URL, embedded_mod.MODEL_ALIAS,
+    bk = Backend("local", embedded_mod.BASE_URL, embedded_mod.model_alias(),
                  OpenAI(base_url=embedded_mod.BASE_URL, api_key="local"))
     if existing is not None:
         existing.adopt(bk)
@@ -732,7 +733,15 @@ def _run_repl(args) -> int:
             console.print(f"[green]model set to[/] {name}"); continue
         if raw == "/model":
             _pick_model(uic); continue
-        if raw in ("/local", "/try"):
+        if raw.split()[0] in ("/local", "/try"):
+            parts = raw.split()
+            if len(parts) > 1:
+                if parts[1] in embedded_mod.PRESETS:
+                    os.environ["XCODE_LOCAL_MODEL"] = parts[1]
+                    embedded_mod.stop_server()
+                else:
+                    console.print(f"[dim]sizes: {', '.join(embedded_mod.PRESETS)} "
+                                  "(tiny=fastest, base=smartest)[/]")
             providers.clear_active()
             _boot_local(backend)
             continue
