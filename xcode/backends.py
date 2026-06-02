@@ -125,7 +125,9 @@ def detect_backend(allow_missing: bool = False) -> Backend:
             errors.append(f"  - {name}: running but no models pulled")
             continue
 
-        model = forced_model or _pick_default(models)
+        saved = providers.saved_local_model()
+        model = forced_model or (saved if saved in models else None) \
+            or _pick_default(models)
         base_url = f"{root}/v1"
         return Backend(name, base_url, model,
                        OpenAI(base_url=base_url, api_key=api_key))

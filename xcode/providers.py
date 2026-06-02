@@ -113,6 +113,7 @@ def set_key(name: str, key: str) -> None:
 def set_active(name: str, model: str | None = None) -> None:
     cfg = load_config()
     cfg["provider"] = name
+    cfg.pop("embedded", None)
     if model:
         cfg["model"] = model
     elif PROVIDERS.get(name, {}).get("default"):
@@ -124,4 +125,29 @@ def clear_active() -> None:
     cfg = load_config()
     cfg.pop("provider", None)
     cfg.pop("model", None)
+    cfg.pop("embedded", None)
     save_config(cfg)
+
+
+def remember_local(model: str | None) -> None:
+    cfg = load_config()
+    cfg.pop("provider", None)
+    cfg.pop("embedded", None)
+    if model:
+        cfg["local_model"] = model
+    save_config(cfg)
+
+
+def remember_embedded() -> None:
+    cfg = load_config()
+    cfg.pop("provider", None)
+    cfg["embedded"] = True
+    save_config(cfg)
+
+
+def saved_local_model() -> str | None:
+    return load_config().get("local_model")
+
+
+def use_embedded() -> bool:
+    return bool(load_config().get("embedded"))

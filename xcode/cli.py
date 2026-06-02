@@ -383,6 +383,8 @@ def _print_status(backend, uic, agent) -> None:
     console.print(f"  mode      {uic.mode}")
     console.print(f"  context   ~{agent.context_tokens():,} tokens")
     console.print(f"  cwd       {Path.cwd()}")
+    console.print(f"  models    {embedded_mod.MODEL_DIR}")
+    console.print(f"  config    {providers.CONFIG_FILE}")
 
 
 def _doctor(backend) -> None:
@@ -561,7 +563,17 @@ def _pick_model(uic: UI) -> None:
     if picked == uic.backend.model:
         return
     uic.backend.model = picked
+    _remember_choice(uic.backend)
     console.print(f"[green]switched to[/] {uic.backend.model}")
+
+
+def _remember_choice(backend) -> None:
+    if backend.name in ("ollama", "llamacpp"):
+        providers.remember_local(backend.model)
+    elif backend.name == "local":
+        providers.remember_embedded()
+    elif backend.name in providers.PROVIDERS:
+        providers.set_active(backend.name, backend.model)
 
 
 def _run_headless(args) -> int:
@@ -623,7 +635,7 @@ def _update_gate() -> None:
 
 def _run_repl(args) -> int:
     _update_gate()
-    if getattr(args, "local", False):
+    if getattr(args, "local", False) or providers.use_embedded():
         booted = _boot_local()
         backend = booted if booted is not None else detect_backend(allow_missing=True)
     else:
@@ -727,9 +739,7 @@ def _run_repl(args) -> int:
         if raw.startswith("/model "):
             name = raw.split(maxsplit=1)[1].strip()
             uic.backend.model = name
-            cfg = providers.load_config()
-            if cfg.get("provider"):
-                cfg["model"] = name; providers.save_config(cfg)
+            _remember_choice(uic.backend)
             console.print(f"[green]model set to[/] {name}"); continue
         if raw == "/model":
             _pick_model(uic); continue
@@ -742,8 +752,8 @@ def _run_repl(args) -> int:
                 else:
                     console.print(f"[dim]sizes: {', '.join(embedded_mod.PRESETS)} "
                                   "(tiny=fastest, base=smartest)[/]")
-            providers.clear_active()
-            _boot_local(backend)
+            if _boot_local(backend) is not None:
+                providers.remember_embedded()
             continue
         if raw.startswith("/provider"):
             parts = raw.split(maxsplit=1)
