@@ -1,6 +1,6 @@
 [project]
 name = "xcoding"
-version = "1.2.0"
+version = "1.2.1"
 description = "xcoding by @c7s89r — a local-model coding agent. Claude Code, but powered by Ollama or llama.cpp."
 readme = "README.md"
 requires-python = ">=3.9"

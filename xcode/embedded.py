@@ -15,9 +15,9 @@ import httpx
 MODEL_DIR = Path.home() / ".xcode" / "models"
 
 PRESETS = {
-    "tiny":  ("Qwen/Qwen2.5-0.5B-Instruct-GGUF", "qwen2.5-0.5b-instruct-q4_k_m.gguf", "qwen2.5-0.5b", "~0.4 GB"),
-    "small": ("Qwen/Qwen2.5-1.5B-Instruct-GGUF", "qwen2.5-1.5b-instruct-q4_k_m.gguf", "qwen2.5-1.5b", "~1 GB"),
-    "base":  ("Qwen/Qwen2.5-3B-Instruct-GGUF",   "qwen2.5-3b-instruct-q4_k_m.gguf",   "qwen2.5-3b",   "~2 GB"),
+    "tiny":  ("Qwen/Qwen2.5-0.5B-Instruct-GGUF", "qwen2.5-0.5b-instruct-q4_k_m.gguf", "xcode-0.5b", "~0.4 GB"),
+    "small": ("Qwen/Qwen2.5-1.5B-Instruct-GGUF", "qwen2.5-1.5b-instruct-q4_k_m.gguf", "xcode-1.5b", "~1 GB"),
+    "base":  ("Qwen/Qwen2.5-3B-Instruct-GGUF",   "qwen2.5-3b-instruct-q4_k_m.gguf",   "xcode-3b",   "~2 GB"),
 }
 DEFAULT_PRESET = "base"
 
@@ -46,7 +46,7 @@ def model_file() -> str:
 
 
 def model_alias() -> str:
-    return f"{_selected()[2]} (built-in)"
+    return _selected()[2]
 
 
 def model_size() -> str:
