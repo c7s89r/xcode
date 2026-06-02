@@ -610,13 +610,13 @@ def _update_gate() -> None:
     except (EOFError, KeyboardInterrupt):
         return
     if choice in ("i", "install", "y", "yes"):
-        console.print("[dim]upgrading…[/]")
-        rc = update_mod.upgrade()
-        if rc == 0:
-            console.print("[green]updated — relaunching[/]\n")
-            update_mod.relaunch()
-        else:
-            console.print("[red]update failed — staying on the current version[/]\n")
+        if update_mod.upgrade_detached():
+            console.print(f"\n[green]updating to {latest} in the background…[/]")
+            console.print("[dim]xcode will close — run [/][bold]xcode[/][dim] "
+                          "again in a few seconds.[/]\n")
+            sys.exit(0)
+        console.print("[red]could not start the update.[/] "
+                      "Close xcode and run: [bold]pip install -U xcoding[/]\n")
     else:
         console.clear()
 

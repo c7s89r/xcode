@@ -59,5 +59,25 @@ def upgrade() -> int:
     )
 
 
+def upgrade_detached() -> bool:
+    py = sys.executable
+    pip_cmd = f'"{py}" -m pip install --upgrade --no-cache-dir {PKG}'
+    try:
+        if os.name == "nt":
+            line = f'ping -n 3 127.0.0.1 >nul & {pip_cmd}'
+            detached = 0x00000008
+            new_group = 0x00000200
+            no_window = 0x08000000
+            subprocess.Popen(["cmd", "/c", line],
+                             creationflags=detached | new_group | no_window,
+                             close_fds=True)
+        else:
+            subprocess.Popen(["sh", "-c", f'sleep 1; {pip_cmd}'],
+                             start_new_session=True)
+        return True
+    except Exception:
+        return False
+
+
 def relaunch() -> None:
     os.execv(sys.executable, [sys.executable, "-m", "xcode"] + sys.argv[1:])
