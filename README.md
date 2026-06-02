@@ -1,7 +1,7 @@
 # xcoding · by [@c7s89r](https://github.com/c7s89r)
 <img width="421" height="269" alt="image" src="https://github.com/user-attachments/assets/ab92aad1-0d05-4f66-8315-cbab80d6473e" />
 
-A local-model coding agent by **@c7s89r** — like Claude Code, but it talks to a
+A local-model coding agent — like Claude Code, but it talks to a
 model running on your own machine instead of a cloud API.
 
 > **✅ Works with [Ollama](https://ollama.com) for now.** Just install Ollama,
