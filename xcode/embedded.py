@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import atexit
 import os
+import re
+import shutil
 import subprocess
 import sys
 import time
@@ -30,6 +32,62 @@ _SERVER_DEPS = ("fastapi", "uvicorn", "starlette_context", "sse_starlette",
                 "pydantic_settings")
 
 
+_ACCEL_LABEL = {
+    "cuda": "NVIDIA GPU (CUDA)",
+    "metal": "Apple GPU (Metal)",
+    "rocm": "AMD GPU",
+    "cpu": "CPU",
+}
+
+
+def detect_accel() -> str:
+    forced = os.getenv("XCODE_LOCAL_ACCEL")
+    if forced:
+        return forced.strip().lower()
+    if sys.platform == "darwin":
+        return "metal"
+    if shutil.which("nvidia-smi"):
+        return "cuda"
+    if shutil.which("rocminfo") or shutil.which("rocm-smi"):
+        return "rocm"
+    return "cpu"
+
+
+def _cuda_tag() -> str:
+    try:
+        out = subprocess.run(["nvidia-smi"], capture_output=True, text=True,
+                             timeout=5).stdout
+        m = re.search(r"CUDA Version:\s*(\d+)\.(\d+)", out)
+        if m:
+            major, minor = int(m.group(1)), int(m.group(2))
+            if major >= 12:
+                if minor >= 4:
+                    return "cu124"
+                if minor >= 3:
+                    return "cu123"
+                if minor >= 2:
+                    return "cu122"
+                return "cu121"
+    except Exception:
+        pass
+    return "cu121"
+
+
+def _accel_index(accel: str) -> str | None:
+    base = "https://abetlen.github.io/llama-cpp-python/whl"
+    if accel == "cuda":
+        return f"{base}/{_cuda_tag()}"
+    if accel == "metal":
+        return f"{base}/metal"
+    if accel == "cpu":
+        return f"{base}/cpu"
+    return None
+
+
+def _gpu_offload(accel: str | None = None) -> bool:
+    return (accel or detect_accel()) in ("cuda", "metal")
+
+
 def have_engine() -> bool:
     import importlib.util as u
     if u.find_spec("llama_cpp") is None:
@@ -37,20 +95,33 @@ def have_engine() -> bool:
     return all(u.find_spec(m) is not None for m in _SERVER_DEPS)
 
 
+def _pip_install_from(index: str, log: Callable[[str], None]) -> bool:
+    rc = subprocess.call(
+        [sys.executable, "-m", "pip", "install", "--upgrade", "--prefer-binary",
+         "llama-cpp-python[server]", "--extra-index-url", index])
+    return rc == 0 and have_engine()
+
+
 def ensure_engine(log: Callable[[str], None] = print) -> bool:
     if have_engine():
         return True
-    log("installing the local engine (llama-cpp-python) — one-time, may take a minute…")
-    subprocess.call([sys.executable, "-m", "pip", "install", "--upgrade",
-                     "llama-cpp-python[server]"])
-    if have_engine():
+    accel = detect_accel()
+    chosen = accel if accel in ("cuda", "metal", "cpu") else "cpu"
+    log(f"detected {_ACCEL_LABEL.get(accel, accel)} — installing the matching "
+        "local engine (prebuilt, one-time, may take a minute)…")
+    if accel == "rocm":
+        log("no prebuilt AMD-GPU wheel — running on CPU (still works; build "
+            "llama-cpp-python with ROCm/Vulkan yourself for GPU offload).")
+
+    if _pip_install_from(_accel_index(chosen), log):
         return True
-    subprocess.call([sys.executable, "-m", "pip", "install", "--upgrade",
-                     *[d.replace("_", "-") for d in _SERVER_DEPS]])
-    if have_engine():
+    if chosen != "cpu" and _pip_install_from(_accel_index("cpu"), log):
+        log("GPU engine unavailable for this setup — using the CPU build.")
         return True
-    log("could not install the local engine automatically. "
-        "Try: pip install 'llama-cpp-python[server]'")
+
+    log("could not install the local engine automatically. Try:\n"
+        "  pip install 'llama-cpp-python[server]' --prefer-binary \\\n"
+        "    --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu")
     return False
 
 
@@ -104,11 +175,13 @@ def start_server(log: Callable[[str], None] = print) -> bool:
     if not model_ready():
         return False
     ctx = os.getenv("XCODE_LOCAL_CTX", "8192")
+    n_gpu_layers = "-1" if _gpu_offload() else "0"
     _proc = subprocess.Popen(
         [sys.executable, "-m", "llama_cpp.server",
          "--model", str(model_path()),
          "--model_alias", MODEL_ALIAS,
          "--n_ctx", ctx,
+         "--n_gpu_layers", n_gpu_layers,
          "--chat_format", "chatml-function-calling",
          "--port", str(PORT)],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

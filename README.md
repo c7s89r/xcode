@@ -22,7 +22,16 @@ xcode --local
 `--local` grabs a small, capable model (Qwen2.5-3B, ~2 GB, one-time download)
 and runs it **in-process** — no Ollama, no llama.cpp, no API key, nothing to
 configure. Great for just trying it out. You can also type `/local` from inside
-xcode anytime. (It pulls in the `llama-cpp-python` engine on first use.)
+xcode anytime.
+
+It installs the right **prebuilt** engine for your machine automatically — no
+compiler needed:
+
+- **NVIDIA GPU** → CUDA build, offloads the model to your GPU
+- **Apple Silicon** → Metal build, runs on the GPU
+- **AMD / no GPU / anything else** → optimized CPU build (always works)
+
+(Detection is automatic; force it with `XCODE_LOCAL_ACCEL=cuda|metal|cpu`.)
 
 ### Quick start (Ollama)
 
